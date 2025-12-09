@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Live Bus Tracker</title>
+</head>
+<body>
+  <h2>Live Location Sharing Active</h2>
+  <p>Your location will be sent every 15 minutes while this page is open and you allow location access.</p>
+
+  <!-- Firebase (use v9 compat or v8 scripts you prefer) -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyC1FFRx6RDwepBKDfRJF3lRIgbKUZklwA4",
+      authDomain: "realtime-database-64cef.firebaseapp.com",
+      databaseURL: "https://realtime-database-64cef-default-rtdb.firebaseio.com/",
+      projectId: "realtime-database-64cef",
+      storageBucket: "realtime-database-64cef.firebasestorage.app",
+      messagingSenderId: "705230114876",
+      appId: "1:705230114876:web:6c17ee4ebb58ebfa88b339",
+      measurementId: "G-QCZLL14SX5"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const params = new URLSearchParams(window.location.search);
+    const user = params.get('user') || 'Unknown';
+
+    function sendLocation() {
+      if (!navigator.geolocation) {
+        alert('Geolocation not supported by this browser.');
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const payload = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy || null,
+            timestamp: Date.now()
+          };
+          db.ref('locations/' + user).set(payload)
+            .then(() => console.log('Location updated for', user, payload))
+            .catch(err => console.error('Firebase write error:', err));
+        },
+        err => {
+          console.error('Geolocation error:', err);
+          // don't spam user with alerts; log instead
+        },
+        { enableHighAccuracy: true, maximumAge: 0 }
+      );
+    }
+
+    // immediate send and then every 15 minutes
+    sendLocation();
+    setInterval(sendLocation, 15 * 60 * 1000);
+  </script>
+</body>
+</html>
