@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bus Tracker</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+</head>
+<body>
+  <h2>Bus Locations</h2>
+  <div id="map" style="height:500px;"></div>
+
+  <script>
+    const firebaseConfig = { /* same config */ };
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const map = L.map("map").setView([28.6, 77.2], 6);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+    let markers = {};
+
+    db.ref("locations").on("value", snapshot => {
+      const data = snapshot.val();
+      Object.keys(data).forEach(userId => {
+        const { lat, lng } = data[userId];
+        if (markers[userId]) {
+          markers[userId].setLatLng([lat, lng]);
+        } else {
+          markers[userId] = L.marker([lat, lng]).addTo(map).bindPopup(userId);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
