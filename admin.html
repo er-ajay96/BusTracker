@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Admin — Live Bus Dashboard</title>
+  <style> #map { height: 90vh; width: 100%; } body { margin:0 } </style>
+</head>
+<body>
+  <h3 style="margin:8px">Live Bus Tracking Dashboard</h3>
+  <div id="map"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  <!-- Put your Google Maps API key below -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyC1FFRx6RDwepBKDfRJF3lRIgbKUZklwA4",
+      authDomain: "realtime-database-64cef.firebaseapp.com",
+      databaseURL: "https://realtime-database-64cef-default-rtdb.firebaseio.com/",
+      projectId: "realtime-database-64cef",
+      storageBucket: "realtime-database-64cef.firebasestorage.app",
+      messagingSenderId: "705230114876",
+      appId: "1:705230114876:web:6c17ee4ebb58ebfa88b339",
+      measurementId: "G-QCZLL14SX5"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let map;
+    const markers = {};
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: 20.5937, lng: 78.9629 }, // India center
+        zoom: 5
+      });
+    }
+    initMap();
+
+    function updateOrCreateMarker(user, lat, lng) {
+      if (!markers[user]) {
+        markers[user] = new google.maps.Marker({
+          position: { lat, lng },
+          map,
+          label: user
+        });
+      } else {
+        markers[user].setPosition({ lat, lng });
+      }
+    }
+
+    // Listen to all location changes
+    db.ref('locations').on('value', snap => {
+      const data = snap.val();
+      if (!data) return;
+      for (const user in data) {
+        const rec = data[user];
+        if (rec && typeof rec.lat === 'number' && typeof rec.lng === 'number') {
+          updateOrCreateMarker(user, rec.lat, rec.lng);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
