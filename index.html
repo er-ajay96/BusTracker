@@ -1,395 +1,165 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>BusTracker — Live (Full)</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformer GIS Map</title>
 
-<!-- Leaflet CSS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<!-- MarkerCluster CSS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
-  :root{--accent:#0057b8;--muted:#666}
-  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
-  #app{display:grid;grid-template-columns:340px 1fr;height:100vh}
-  .sidebar{padding:12px;border-right:1px solid #eee;box-sizing:border-box;overflow:auto;background:#fff}
-  .mapwrap{position:relative}
-  #map{height:100vh;width:100%}
-  h1{font-size:18px;margin:0 0 8px}
-  label{font-size:13px;color:var(--muted)}
-  input,select,button{width:100%;padding:8px;border-radius:6px;border:1px solid #ddd;margin-top:6px;box-sizing:border-box}
-  .row{display:flex;gap:8px}
-  .small{padding:6px;font-size:13px}
-  .card{background:#fafafa;border-radius:8px;padding:10px;margin:8px 0;border:1px solid #eee}
-  .user-list{margin-top:10px}
-  .user-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:6px}
-  .badge{padding:4px 8px;border-radius:999px;background:#eee;font-size:12px}
-  .alert-badge{background:#ff4d4f;color:#fff}
-  .muted{color:var(--muted);font-size:13px}
-  footer{font-size:12px;color:var(--muted);margin-top:12px}
-  .controls{display:flex;gap:8px}
-  .btn-primary{background:var(--accent);color:#fff;border:none}
-  .btn-danger{background:#ff4d4f;color:#fff;border:none}
-  .status-online{color:green}
-  .status-offline{color:#c00}
-  pre{white-space:pre-wrap;word-break:break-all}
+body { margin:0; font-family: Arial, sans-serif; }
+#map { height: calc(100vh - 50px); width: 100%; }
+
+.topbar {
+  display:flex;
+  gap:8px;
+  padding:6px;
+  background:#f1f5f9;
+}
+.topbar input {
+  flex:1;
+  padding:6px;
+}
+.topbar button {
+  padding:6px 10px;
+  cursor:pointer;
+}
+
+.label {
+  font-size:11px;
+  font-weight:bold;
+  background:white;
+  padding:2px 4px;
+  border-radius:4px;
+  box-shadow:0 0 3px rgba(0,0,0,0.4);
+}
 </style>
 </head>
 <body>
-<div id="app">
-  <div class="sidebar">
-    <h1>BusTracker — Live (Full)</h1>
 
-    <div class="card">
-      <label for="name">Your name (or bus id)</label>
-      <input id="name" placeholder="e.g. A or Bus-1" />
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button id="startBtn" class="small btn-primary">Start Sharing</button>
-        <button id="stopBtn" class="small btn-danger" disabled>Stop</button>
-      </div>
-      <div style="margin-top:8px">
-        <label class="muted">Update interval</label>
-        <select id="interval" title="Update interval">
-          <option value="900000">15 minutes</option>
-          <option value="300000">5 minutes</option>
-          <option value="60000">1 minute</option>
-        </select>
-      </div>
-      <div style="margin-top:8px" class="muted">Status: <span id="shareStatus">Not sharing</span></div>
-    </div>
-
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <strong>Active Users</strong>
-        <span id="activeCount" class="badge">0</span>
-      </div>
-      <div id="users" class="user-list"></div>
-    </div>
-
-    <div class="card">
-      <strong>Global Controls</strong>
-      <div style="margin-top:8px" class="controls">
-        <button id="centerAll" class="small">Fit All</button>
-        <button id="clearHistory" class="small">Clear All Paths</button>
-      </div>
-      <div style="margin-top:10px" class="muted">Offline/Network: <span id="netStatus">online</span></div>
-    </div>
-
-    <footer>Built with Leaflet + Firebase Realtime DB.<br>Uploads go to <code>locations/{user}/last</code> and <code>locations/{user}/positions</code>.</footer>
-  </div>
-
-  <div class="mapwrap">
-    <div id="map"></div>
-  </div>
+<div class="topbar">
+  <input type="text" id="searchBox" placeholder="🔍 Search Transformer / ID">
+  <button onclick="printMap()">📄 Print / PDF</button>
 </div>
 
-<!-- Firebase compat libs -->
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+<div id="map"></div>
 
-<!-- Leaflet + MarkerCluster -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
-/* ====== CONFIG ====== */
-// Replace with your Firebase config (databaseURL included)
-const firebaseConfig = {
-  apiKey: "AIzaSyC1FFRx6RDwepBKDfRJF3lRIgbKUZklwA4",
-  authDomain: "realtime-database-64cef.firebaseapp.com",
-  databaseURL: "https://realtime-database-64cef-default-rtdb.firebaseio.com/",
-  projectId: "realtime-database-64cef",
-  storageBucket: "realtime-database-64cef.firebasestorage.app",
-  messagingSenderId: "705230114876",
-  appId: "1:705230114876:web:6c17ee4ebb58ebfa88b339",
-  measurementId: "G-QCZLL14SX5"
-};
-/* ===================== */
+/* ---------------- MAP ---------------- */
+const map = L.map('map').setView([31.60, 76.96], 12);
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-// UI elements
-const nameInput = document.getElementById('name');
-const startBtn = document.getElementById('startBtn');
-const stopBtn = document.getElementById('stopBtn');
-const intervalSelect = document.getElementById('interval');
-const shareStatus = document.getElementById('shareStatus');
-const usersDiv = document.getElementById('users');
-const activeCountEl = document.getElementById('activeCount');
-const centerAllBtn = document.getElementById('centerAll');
-const clearHistoryBtn = document.getElementById('clearHistory');
-const netStatusEl = document.getElementById('netStatus');
-
-let sharing = false;
-let shareIntervalId = null;
-let lastPos = null;
-let userName = localStorage.getItem('bt_name') || '';
-nameInput.value = userName;
-
-// Map setup
-const map = L.map('map').setView([20.5937, 78.9629], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  maxZoom: 19, attribution:'© OpenStreetMap contributors'
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19
 }).addTo(map);
 
-// clustering group
-const clusterGroup = L.markerClusterGroup();
-map.addLayer(clusterGroup);
+const satellite = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  { maxZoom: 19 }
+);
 
-// per-user state
-const users = {}; // user -> { marker, polyline, positions:[], last, battery }
-const PATH_COLOR = ['#2b8cbe','#7b3294','#7fbc41','#e31a1c','#ff7f00','#6baed6'];
+L.control.layers(
+  { "🗺️ Map": osm, "🛰️ Satellite": satellite }
+).addTo(map);
 
-// Utilities
-function nowUTC(){return Date.now();}
-function fmtTime(ts){
-  if(!ts) return 'never';
-  const d = new Date(ts);
-  return d.toLocaleString();
-}
-function haversine(a,b){
-  // returns meters
-  const toRad = v => v*Math.PI/180;
-  const R = 6371000;
-  const dlat = toRad(b.lat-a.lat), dlng = toRad(b.lng-a.lng);
-  const lat1 = toRad(a.lat), lat2 = toRad(b.lat);
-  const hav = Math.sin(dlat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dlng/2)**2;
-  return 2*R*Math.asin(Math.sqrt(hav));
-}
-
-// Render user list (cards)
-function renderUsers(){
-  usersDiv.innerHTML = '';
-  const keys = Object.keys(users).sort();
-  activeCountEl.textContent = keys.length;
-  keys.forEach((u,i)=>{
-    const s = users[u];
-    const el = document.createElement('div');
-    el.className = 'user-item';
-    const left = document.createElement('div');
-    left.innerHTML = `<strong>${u}</strong><div class="muted">Last: ${fmtTime(s.last?.timestamp)}</div>`;
-    const right = document.createElement('div');
-    const age = s.last ? (nowUTC() - s.last.timestamp) : Infinity;
-    const alert = age > 30*60*1000;
-    const badge = document.createElement('span');
-    badge.className = 'badge' + (alert ? ' alert-badge' : '');
-    badge.textContent = alert ? 'stale' : 'ok';
-    const info = document.createElement('div');
-    info.style.fontSize='12px'; info.style.textAlign='right';
-    const battery = s.battery!==undefined ? `Bat:${Math.round(s.battery*100)}%` : '';
-    const speed = s.last?.speed ? `${Math.round(s.last.speed)} m/s` : '';
-    const acc = s.last?.accuracy ? `${Math.round(s.last.accuracy)}m` : '';
-    info.innerHTML = `${speed} ${acc}<div class="muted">${battery}</div>`;
-    right.appendChild(badge);
-    right.appendChild(info);
-    el.appendChild(left);
-    el.appendChild(right);
-    el.style.borderBottom = '1px solid #f1f1f1';
-    usersDiv.appendChild(el);
+/* ---------------- ICONS BY KVA ---------------- */
+function icon(color){
+  return L.divIcon({
+    html:`<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white"></div>`
   });
 }
+const kvaIcon = {
+  25: icon("green"),
+  63: icon("blue"),
+  100: icon("orange"),
+  250: icon("red")
+};
 
-// update or create marker/polyline for user
-function updateUserOnMap(user, last, positions, battery){
-  let s = users[user];
-  if(!s){
-    s = { marker: null, polyline: null, positions: [], last:null, battery };
-    users[user] = s;
-  }
-  s.last = last;
-  if(battery!==undefined) s.battery = battery;
-  // update positions array (keep last N)
-  s.positions = positions || s.positions;
-  if(s.positions.length>1000) s.positions = s.positions.slice(-1000);
+/* ---------------- DATA ---------------- */
+const locations = [
+  { lat:31.6054808, lng:76.9639604, label:"100 KVA stoh 2nd-1315410314647", kva:100 },
+  { lat:31.6098588, lng:76.9599462, label:"25 KVA Stoh 3rd-1315410314546", kva:25 },
+  { lat:31.5872733, lng:76.9701150, label:"250 KVA khiuri 1st-1315410315657", kva:250 },
+  { lat:31.5907910, lng:76.9516289, label:"63 KVA Bhura 4th-1315410315556", kva:63 },
+  { lat:31.5998891, lng:76.9557079, label:"100 KVA stoh 4th-1315410315354", kva:100 },
+  { lat:31.6048573, lng:76.9594451, label:"100 KVA stoh 1st-1315410315051", kva:100 },
+  { lat:31.6088808, lng:76.9531359, label:"63 KVA Ghatta 3rd-1315410314445", kva:63 },
+  { lat:31.6015198, lng:76.9668138, label:"25 KVA barshala-1315410314849", kva:25 },
+  { lat:31.5947936, lng:76.9573090, label:"25 KVA KEHAD 2ND-1315410313334", kva:25 },
+  { lat:31.5915190, lng:76.9618198, label:"63 KVA NALSAR BHIURA-1315410313637", kva:63 },
+  { lat:31.5887108, lng:76.9541419, label:"63 KVA BHIURA 3RD-1315410313839", kva:63 },
+  { lat:31.6006359, lng:76.9493730, label:"100 KVA BHIURA 1ST-1315410314041", kva:100 },
+  { lat:31.5830256, lng:76.9662600, label:"25 KVA KHURI-1315410312122", kva:25 },
+  { lat:31.5840843, lng:76.9677875, label:"250 KVA KANGRU-1315410312223", kva:250 },
+  { lat:31.5826247, lng:76.9675612, label:"25 KVA JIO MANDIR KANDLOO-1315410312324", kva:25 },
+  { lat:31.5915517, lng:76.9597925, label:"25 KVA CHATYARA-1315410313738", kva:25 },
+  { lat:31.5922828, lng:76.9703533, label:"25 KVA BHARTI AIRTEL BAN LOG TOWER-1315410312526", kva:25 },
+  { lat:31.5997403, lng:76.9780508, label:"63 KVA PIPALOO-1315410312930", kva:63 },
+  { lat:31.6043092, lng:76.9710922, label:"63 KVA CHWARI-1315410313031", kva:63 },
+  { lat:31.5946041, lng:76.9630319, label:"100 KVA KEHAD 1ST-1315410313233", kva:100 },
+  { lat:31.6042353, lng:76.9490378, label:"100 KVA G.H.A GHADROUR-1315410314142", kva:100 },
+  { lat:31.6124838, lng:76.9512566, label:"63 KVA LWSS GHAMBER KHAD-1315410413738", kva:63 },
+  { lat:31.6134075, lng:76.9496180, label:"25 KVA RELIANCE JIO GHATTA-1315410314243", kva:25 },
+  { lat:31.5953240, lng:76.9759677, label:"25 KVA CHAWARI AT RIGGER-1315410312728", kva:25 },
+  { lat:31.5965985, lng:76.9695887, label:"100 KVA RAJGARH 1ST-1315410313132", kva:100 },
+  { lat:31.6096476, lng:76.9491654, label:"100 KVA GHATTA 2ND-1315410314344", kva:100 },
+  { lat:31.5671467, lng:76.9628967, label:"25 KVA LOHARDI KOT-1315410311920", kva:25 },
+  { lat:31.5686417, lng:76.9646700, label:"63 KVA SURANDI KOT-1315410312021", kva:63 },
+  { lat:31.5973463, lng:76.9749273, label:"63 KVA KEHD STOH RIGGAR PUMP-1315410315455", kva:63 },
+  { lat:31.6039864, lng:76.9643332, label:"63 KVA RIGGER PUMP-1315410314748", kva:63 },
+  { lat:31.5984543, lng:76.9430759, label:"63 KVA T-5 (KUMMI PUMP)-1315410412930", kva:63 },
+  { lat:31.6018749, lng:76.9427117, label:"63 KVA 22/0.4 KV T6-1315410413233", kva:63 },
+  { lat:31.6106165, lng:76.9469820, label:"100 KVA KATHYAL CHATARU PUMP-1315410413637", kva:100 },
+  { lat:31.5984997, lng:76.9430075, label:"63 KVA BHIURA 5TH-1315410413031", kva:63 },
+  { lat:31.5992968, lng:76.9400005, label:"100 KVA BHIURA 2ND-1315410413132", kva:100 },
+  { lat:31.6127261, lng:76.9451170, label:"100 KVA CHALI (KUMMI 5)-1315410413435", kva:100 },
+  { lat:31.6148058, lng:76.9483467, label:"100 KVA CHATARU-1315410413536", kva:100 },
+  { lat:31.6087095, lng:76.9459905, label:"63 KVA KHATHYAL-1315410413334", kva:63 }
+];
 
-  // polyline
-  if(!s.polyline){
-    const color = PATH_COLOR[Math.abs(hashCode(user)) % PATH_COLOR.length];
-    s.polyline = L.polyline(s.positions.map(p=>[p.lat,p.lng]),{color,weight:4,opacity:0.8}).addTo(map);
-  } else {
-    s.polyline.setLatLngs(s.positions.map(p=>[p.lat,p.lng]));
-  }
+/* ---------------- MARKERS ---------------- */
+const markers = [];
 
-  // marker
-  const icon = L.divIcon({className:'custom-marker',html:`<div style="background:${pickColor(user)};color:#fff;padding:6px 8px;border-radius:6px">${user}</div>`});
-  if(!s.marker){
-    s.marker = L.marker([last.lat,last.lng],{icon}).addTo(clusterGroup);
-    s.marker.bindPopup(popupHtml(user,s));
-  } else {
-    s.marker.setLatLng([last.lat,last.lng]);
-    s.marker.setPopupContent(popupHtml(user,s));
-  }
-}
-
-// small deterministic color
-function pickColor(name){
-  return PATH_COLOR[Math.abs(hashCode(name)) % PATH_COLOR.length];
-}
-function hashCode(str){
-  let h=0; for(let i=0;i<str.length;i++){ h = (h<<5)-h + str.charCodeAt(i); h |= 0; } return h;
-}
-function popupHtml(user,s){
-  const bat = s.battery!==undefined ? `<div>Battery: ${Math.round(s.battery*100)}%</div>` : '';
-  const speed = s.last?.speed ? `<div>Speed: ${Math.round(s.last.speed)} m/s</div>` : '';
-  const acc = s.last?.accuracy ? `<div>Accuracy: ${Math.round(s.last.accuracy)} m</div>` : '';
-  const time = `<div>Last: ${fmtTime(s.last?.timestamp)}</div>`;
-  return `<div><strong>${user}</strong>${time}${speed}${acc}${bat}</div>`;
-}
-
-// listen to DB
-const locRef = db.ref('locations');
-locRef.on('value', snap=>{
-  const val = snap.val() || {};
-  // iterate users
-  for(const user in val){
-    const last = val[user].last || null;
-    // positions may be stored as push keys; convert to array in order
-    const posObj = val[user].positions || {};
-    const positions = Object.keys(posObj).sort().map(k=>posObj[k]).slice(-500);
-    const battery = val[user].battery; // optional
-    if(last){
-      updateUserOnMap(user,last,positions,battery);
-    }
-  }
-  renderUsers();
+locations.forEach(l => {
+  const m = L.marker([l.lat,l.lng],{icon:kvaIcon[l.kva]}).addTo(map);
+  m.bindPopup(`
+    <b>${l.label}</b><br>
+    🔋 ${l.kva} KVA<br><br>
+    <button onclick="navigate(${l.lat},${l.lng})">🧭 Navigate</button>
+  `);
+  m.bindTooltip(`<div class="label">${l.label}</div>`,
+    {permanent:true,direction:"top",offset:[0,-8]}
+  );
+  markers.push({marker:m,text:l.label.toLowerCase()});
 });
 
-// Fit all markers
-centerAllBtn.addEventListener('click',()=>{
-  const allLatLng = [];
-  for(const u in users){
-    const s = users[u];
-    if(s.last) allLatLng.push([s.last.lat,s.last.lng]);
-  }
-  if(allLatLng.length) map.fitBounds(allLatLng,{padding:[40,40]});
+map.fitBounds(markers.map(m=>m.marker.getLatLng()));
+
+/* ---------------- SEARCH ---------------- */
+document.getElementById("searchBox").addEventListener("input",e=>{
+  const q=e.target.value.toLowerCase();
+  markers.forEach(m=>{
+    if(m.text.includes(q)){
+      m.marker.addTo(map);
+    } else {
+      map.removeLayer(m.marker);
+    }
+  });
 });
 
-// Clear polylines (not DB)
-clearHistoryBtn.addEventListener('click',()=>{
-  for(const u in users){
-    if(users[u].polyline){ map.removeLayer(users[u].polyline); users[u].polyline = null; users[u].positions = []; }
-  }
-  renderUsers();
-});
-
-// network online/offline
-window.addEventListener('online', ()=> netStatusEl.textContent = 'online');
-window.addEventListener('offline', ()=> netStatusEl.textContent = 'offline');
-
-// Sharing controls
-function startSharing(){
-  const name = (nameInput.value || '').trim();
-  if(!name){ alert('Enter a name or ID'); return; }
-  userName = name;
-  localStorage.setItem('bt_name', userName);
-  sharing = true;
-  startBtn.disabled = true;
-  stopBtn.disabled = false;
-  shareStatus.textContent = 'Sharing as ' + userName;
-  sendLocationOnce();
-  const ms = parseInt(intervalSelect.value,10) || 900000;
-  if(shareIntervalId) clearInterval(shareIntervalId);
-  shareIntervalId = setInterval(sendLocationOnce, ms);
-}
-function stopSharing(){
-  sharing = false;
-  startBtn.disabled = false;
-  stopBtn.disabled = true;
-  if(shareIntervalId) clearInterval(shareIntervalId);
-  shareStatus.textContent = 'Not sharing';
-  // Optionally remove last presence (comment out if you want persistence)
-  db.ref('locations/' + userName + '/last').remove().catch(()=>{});
+/* ---------------- PRINT / PDF ---------------- */
+function printMap(){
+  window.print();
 }
 
-startBtn.addEventListener('click', startSharing);
-stopBtn.addEventListener('click', stopSharing);
-
-// send location and push to positions
-async function sendLocationOnce(){
-  if(!navigator.geolocation){
-    alert('Geolocation not supported by this browser.');
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(async pos=>{
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
-    const accuracy = pos.coords.accuracy || null;
-    const timestamp = Date.now();
-    // compute speed using last position if available
-    const userRef = db.ref('locations/' + userName);
-    // read last locally if exists to compute speed
-    const lastLocal = users[userName]?.last;
-    let speed = null;
-    if(lastLocal && lastLocal.latitude && false) {
-      // not used
-    } else if (lastLocal && lastLocal.timestamp) {
-      const lastPos = {lat:lastLocal.lat,lng:lastLocal.lng,timestamp:lastLocal.timestamp};
-      const dist = haversine(lastPos,{lat,lng}); // meters
-      const dt = (timestamp - lastPos.timestamp)/1000; // seconds
-      if(dt>0) speed = dist/dt;
-    }
-    const lastObj = {lat,lng,accuracy,timestamp,speed};
-    // write last and push to positions
-    try{
-      await userRef.child('last').set(lastObj);
-      await userRef.child('positions').push(lastObj);
-      // also try to store battery if available
-      const bat = await getBatteryLevelSafe();
-      if(bat!==undefined) userRef.child('battery').set(bat);
-      console.log('Location sent',userName,lastObj);
-    }catch(e){
-      console.error('Firebase write failed',e);
-    }
-  }, err=>{
-    console.error('Geolocation error',err);
-    if(err && err.code===1) alert('Please allow location access for this site.');
-  }, {enableHighAccuracy:true, maximumAge:5000});
+/* ---------------- NAVIGATION ---------------- */
+function navigate(lat,lng){
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  window.open(url,'_blank');
 }
-
-// battery helper (some browsers support)
-async function getBatteryLevelSafe(){
-  try{
-    if(navigator.getBattery){
-      const b = await navigator.getBattery();
-      return b.level; // 0..1
-    }
-  }catch(e){}
-  return undefined;
-}
-
-// Auto-centre when new user appears (once)
-let initialCentered=false;
-locRef.on('child_added', snap=>{
-  if(!initialCentered){
-    setTimeout(()=>centerAllBtn.click(),800);
-    initialCentered=true;
-  }
-});
-
-// Auto-prune UI stale users every 10 minutes (client side)
-setInterval(()=> {
-  const cutoff = Date.now() - 1000*60*60*24; // keep
-  for(const u in users){
-    // nothing auto-remove; show stale with badge
-  }
-  renderUsers();
-}, 600000);
-
-// try to restore name and auto-start if user asked
-if(userName){
-  nameInput.value = userName;
-  // do not auto-start by default, wait for user to press start
-}
-
-/* Debug helpers for desktop testing (optional):
-Open console and use:
-firebase.database().ref('locations').set({}); OR
-firebase.database().ref('locations/Test/last').set({lat:12,lng:77,timestamp:Date.now()});
-*/
 
 </script>
 </body>
