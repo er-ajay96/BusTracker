@@ -1,166 +1,2366 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Transformer GIS Map</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Electrical Line Survey V3.8</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <style>
-body { margin:0; font-family: Arial, sans-serif; }
-#map { height: calc(100vh - 50px); width: 100%; }
+    /* Combined & cleaned CSS — retains your Android styling and V3.8 UI */
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg,#e0f2fe 0%,#ddd6fe 100%); min-height:100vh; padding:16px; padding-bottom:60px; }
+    .container{max-width:1200px;margin:0 auto}
+    .card{background:white;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.1);padding:24px;margin-bottom:24px}
+    .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:16px}
+    .header-left{display:flex;align-items:center;gap:16px}
+    .icon-box{background:#3b82f6;padding:12px;border-radius:12px;color:white;font-size:28px}
+    .title-section h1{font-size:24px;color:#1f2937;margin-bottom:4px}
+    .title-section p{font-size:14px;color:#6b7280}
+    .distance-display{text-align:right}
+    .distance-value{font-size:32px;font-weight:bold;color:#3b82f6}
+    .distance-label{font-size:14px;color:#6b7280}
+    .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}
+    .stat-card{padding:16px;border-radius:12px}
+    .stat-card.blue{background:#eff6ff}
+    .stat-card.green{background:#f0fdf4}
+    .stat-card.purple{background:#faf5ff}
+    .stat-label{font-size:14px;color:#6b7280;margin-bottom:4px}
+    .stat-value{font-size:24px;font-weight:bold}
+    .stat-value.blue{color:#3b82f6}
+    .stat-value.green{color:#10b981}
+    .stat-value.purple{color:#a855f7}
+    .btn{padding:12px 24px;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.2s;width:100%}
+    .btn:disabled{background:#d1d5db !important;color:#9ca3af !important;cursor:not-allowed}
+    .btn-green{background:#10b981;color:white}
+    .btn-red{background:#ef4444;color:white}
+    .btn-blue{background:#3b82f6;color:white}
+    .btn-purple{background:#a855f7;color:white}
+    select {
+        width: 100%; padding: 14px 16px; border: 1px solid #d1d5db; border-radius: 12px; font-size: 16px; font-weight: 600; background-color: #ffffff; appearance: none; -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236B7280'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 16px center; background-size: 18px;
+    }
+    /* --- START: NEW STYLES FOR USER REQUESTS --- */
 
-.topbar {
-  display:flex;
-  gap:8px;
-  padding:6px;
-  background:#f1f5f9;
+/* New styles for Request 1: Mobile-friendly user controls (Auto-adjusting grid) */
+.user-controls-mobile-grid {
+    display: flex;
+    justify-content: space-between; /* Pushes stacks to opposite sides */
+    align-items: flex-start;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb; /* Separator line */
 }
-.topbar input {
-  flex:1;
-  padding:6px;
+.user-info-stack {
+    display: flex;
+    flex-direction: column; /* Stacks UserName and Change Password */
+    gap: 4px;
 }
-.topbar button {
-  padding:6px 10px;
-  cursor:pointer;
+.user-action-stack {
+    display: flex;
+    flex-direction: column; /* Stacks Logout and User Manual */
+    gap: 4px;
+    align-items: flex-end; /* Aligns buttons to the right */
+    text-align: right;
+}
+#activeUsernameDisplay { 
+    font-weight: 700; 
+    color: #10b981; 
+    font-size: 16px;
+}
+.user-info-stack a, .user-action-stack a {
+    color: #3b82f6; 
+    text-decoration: none; 
+    font-weight: 600; 
+    font-size: 14px;
+}
+.user-action-stack .logout-link {
+    color: #ef4444; 
 }
 
-.label {
-  font-size:11px;
-  font-weight:bold;
-  background:white;
-  padding:2px 4px;
-  border-radius:4px;
-  box-shadow:0 0 3px rgba(0,0,0,0.4);
+/* --- REPLACE EXISTING MAP UI STYLES (around line 105) WITH THIS BLOCK: --- */
+
+/* New styles for Request 2: Map Controls (Smaller, moved to top, canvas fits box) */
+.map-container-wrapper-new {
+    /* Stack controls and map vertically, ensuring 100% width usage */
+    display: flex;
+    flex-direction: column; 
+    gap: 10px; 
+    margin-top: 15px;
+    margin-bottom: 25px;
 }
+
+.canvas-controls-panel-new {
+    /* Layout controls horizontally at the top */
+    display: flex;
+    justify-content: flex-start; 
+    align-items: center;
+    gap: 6px; /* Reduced gap between small buttons */
+    margin-bottom: 0px; 
+}
+
+/* Smaller Zoom Buttons */
+.zoom-btn-new {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    width: 30px; /* Smaller */
+    height: 30px; /* Smaller */
+    border-radius: 50%;
+    font-size: 18px; /* Smaller font */
+    font-weight: 700;
+    line-height: 1; 
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
+    transition: background 0.2s, transform 0.1s;
+    padding: 0;
+}
+.zoom-btn-new:hover {
+    background: #2563eb;
+    transform: scale(1.05);
+}
+
+/* Smaller Reset Button */
+.reset-btn-new {
+    background: #f3f4f6; 
+    color: #4b5563;
+    border: 1px solid #d1d5db;
+    width: 60px; /* Smaller width */
+    padding: 6px 4px; /* Smaller padding */
+    font-size: 12px; /* Smaller font */
+    font-weight: 600;
+    border-radius: 8px; 
+}
+.reset-btn-new:hover {
+    background: #e5e7eb;
+}
+
+/* Ensure the canvas looks good too (inherited from global styles) */
+#mapCanvas {
+    /* Remove redundant styling if any was here, relies on global canvas{width:100%;} */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+}
+
+/* --- END: NEW STYLES FOR USER REQUESTS --- */
+    select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25); }
+    .selection-group{margin-bottom:20px;padding:15px;border:1px solid #e5e7eb;border-radius:12px;background:#f9fafb}
+    .selection-group-title{display:block;font-weight:700;margin-bottom:12px;color:#1f2937;font-size:16px}
+    .radio-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+    .radio-group label{display:flex;align-items:center;padding:10px;border:2px solid #d1d5db;border-radius:8px;font-size:14px;cursor:pointer;background:white}
+    .radio-group input[type="radio"]{margin-right:8px;accent-color:#3b82f6}
+    .marker-types{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+    .marker-btn{padding:16px;border:none;border-radius:12px;background:#f3f4f6;cursor:pointer;transition:all 0.2s;font-weight:600}
+    .marker-btn:hover{background:#e5e7eb}
+    .marker-btn.active{background:#3b82f6;color:white}
+    .marker-icon{font-size:32px;margin-bottom:8px}
+    .marker-label{font-size:14px}
+    .button-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    canvas{width:100%;border:2px solid #e5e7eb;border-radius:12px}
+    .markers-list{max-height:300px;overflow-y:auto}
+    .marker-item{display:flex;align-items:center;justify-content:space-between;background:#f9fafb;padding:12px;border-radius:12px;margin-bottom:8px}
+    .marker-info{display:flex;align-items:center;gap:12px}
+    .marker-item-icon{font-size:24px}
+    .marker-details h4{font-size:16px;color:#1f2937;margin-bottom:4px}
+    .marker-coords{font-size:12px;color:#6b7280}
+    .span-length{font-size:12px;font-weight:bold;margin-left:8px}
+    .delete-btn{background:#fee2e2;color:#ef4444;border:none;padding:8px;border-radius:8px;cursor:pointer}
+    .delete-btn:hover{background:#fecaca}
+    h2{font-size:18px;color:#1f2937;margin-bottom:16px}
+    input[type="file"]{display:none}
+    label.btn{cursor:pointer}
+    .text-input-group{margin-bottom:20px}
+    .text-input-group label{display:block;font-weight:600;margin-bottom:8px;color:#374151}
+    .text-input-group input{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:16px}
+    
+    /* Style for the main application footer (outside of auth screen) */
+    .footer-info{
+        text-align:center;padding:20px 0;font-size:12px;color:#6b7280;margin-top:24px;border-top:1px solid #e5e7eb;
+        background: rgba(255,255,255,0.5); /* Semi-transparent background for Auth screen */
+        border-radius: 12px; 
+        padding-top: 10px; 
+        margin-top: 30px;
+    }
+
+    #leafletMap{height:500px;width:100%;border:2px solid #e5e7eb;border-radius:12px}
+    @media (max-width:768px){
+      .stats-grid{grid-template-columns:1fr}
+      .marker-types{grid-template-columns:repeat(2,1fr)}
+      .radio-grid{grid-template-columns:1fr}
+      .button-grid{grid-template-columns:1fr}
+      .header{flex-direction:column;text-align:center}
+      .distance-display{text-align:center}
+    }
+ 
+
+    /* --- Authentication Styles (FIXED for Logo, Scrolling, and Footer) --- */
+    #authContainer {
+        position: fixed;
+        top: 0; left: 0; width: 100%; 
+        min-height: 100vh;
+        
+        /* Enables vertical scrolling and drag-ability on mobile */
+        display: block; 
+        overflow-y: auto; 
+        -webkit-overflow-scrolling: touch; 
+        
+        background: linear-gradient(135deg,#e0f2fe 0%,#ddd6fe 100%);
+        padding-top: 5vh; 
+        z-index: 1000; padding: 20px;
+    }
+    
+    /* LOGO STYLE */
+    .auth-logo {
+        max-width: 150px; 
+        height: auto;
+        margin: 0 auto 20px auto; 
+        display: block; 
+        border-radius: 8px; 
+    }
+
+    /* Card styling updated for scrolling flow */
+    .auth-card {
+        background: white; border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        padding: 30px; 
+        width: 100%; 
+        max-width: 400px; 
+        text-align: center;
+        /* Margin for centering and ensuring space before footer */
+        margin: 0 auto 20px auto; 
+        flex-shrink: 0; 
+        padding-top: 20px; 
+    }
+
+    .auth-card h2 { font-size: 24px; margin-bottom: 20px; color: #1f2937; }
+    .auth-card input[type="password"], .auth-card input[type="text"] {
+        width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; margin-bottom: 15px; font-size: 16px;
+    }
+    .auth-card{
+    margin-bottom: 24px;
+}
+
+    .auth-card .btn { margin-top: 10px; width: 100%; font-size: 18px; }
+    .auth-card p { margin-top: 15px; font-size: 14px; }
+    .form-section { display: none; }
+    .form-section.active { display: block; }
+    #messageDisplay {
+        padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center;
+        font-weight: 600; display: none;
+    }
+    .msg-success { background: #d1fae5; color: #059669; }
+    .msg-error { background: #fee2e2; color: #ef4444; }
+    .msg-info { background: #eff6ff; color: #3b82f6; }
+
+    /* FIX: Ensure the footer added to auth screen is centered and spans max width */
+    #authContainer{
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    min-height: 100vh;
+
+    /* ENABLE SCROLL */
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    /* Smooth mobile scrolling (iOS / Android) */
+    -webkit-overflow-scrolling: touch;
+
+    /* Layout safety */
+    display: block ;
+
+    background: linear-gradient(135deg,#e0f2fe 0%,#ddd6fe 100%);
+    padding: 20px;
+    padding-top: 5vh;
+    z-index: 1000;
+}
+
+    
+    /* --- FIX FOR FOOTER BUTTONS JUMPING --- */
+    .footer-buttons {
+        /* Overrides any default styling to fix the element at the bottom */
+        position: fixed; 
+        bottom: 0;      
+        left: 0;        
+        width: 100%;    
+        z-index: 1000;  
+        border-radius: 0;
+        padding-top: 16px; 
+        padding-bottom: 16px;
+        margin: 0; 
+        box-shadow: 0 -5px 15px rgba(0,0,0,0.1); 
+    }
+
+    /* IMPORTANT: Increase body padding to prevent content from being hidden behind the fixed footer */
+    body {
+        /* Existing style: padding-bottom:60px; */
+        /* Updated: Ensure enough space for a fixed bottom bar */
+        padding-bottom: 80px; 
+    }
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <input type="text" id="searchBox" placeholder="🔍 Search Transformer / ID">
-  <button onclick="printMap()">📄 Print / PDF</button>
+<div id="authContainer">
+  <div class="auth-card">
+    <img src="https://raw.githubusercontent.com/er-ajay96/SurveyAppV1.0.0/refs/heads/main/icon.png" alt="App Logo" class="auth-logo">
+    <div id="messageDisplay"></div>
+    <div id="loginForm" class="form-section active">
+        <h2>User Login SurveyApp V3.8</h2>
+            <input type="text" id="loginUsername" placeholder="Unique Username (Used as Email in Backend)" required>
+            <input type="password" id="loginPassword" placeholder="Password" required>
+            <button class="btn btn-green" onclick="loginUser()">Login</button>
+            <p>New User? <a href="#" onclick="showForm('registerRequestForm')" style="color:#3b82f6;">Register</a></p>
+            <p>Forgot Password? <a href="#" onclick="showForm('forgotForm')" style="color:#ef4444;">Reset</a></p>
+        </div>
+
+      <div id="registerRequestForm" class="form-section">
+    <h2>New User Registration</h2>
+
+    <input type="text" id="regName" placeholder="Full Name" required>
+    <input type="text" id="regMobile" placeholder="Mobile Number" required>
+
+    <input type="text" id="registerUsername" placeholder="Unique Username (Email)" required>
+    <input type="password" id="registerPassword" placeholder="Password (Min 6 chars)" required>
+    <input type="password" id="registerConfirmPassword" placeholder="Confirm Password" required>
+
+    <input type="text" id="regPaymentId" placeholder="Payment Reference / UPI Txn ID" required>
+    <!-- Payment Info -->
+    <p style="margin-top:12px;">
+        <a href="#" onclick="openPaymentPopup()">💳 View Payment Option to Developer </a>
+    </p>
+
+    <!-- Upload Payment Proof -->
+    <label class="btn btn-blue" style="margin-top:10px;">
+        📤 Upload Payment Screenshot
+        <input type="file" id="regPaymentProof" accept="image/*">
+    </label>
+
+  
+    <button class="btn btn-green" onclick="submitSignupWithPayment()">
+        Submit Registration & Payment
+    </button>
+
+    <p>Back to <a href="#" onclick="showForm('loginForm')">Login</a></p>
 </div>
 
-<div id="map"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <div id="otpVerificationForm" class="form-section">
+            <h2>OTP Verification</h2>
+            <p id="otpPrompt" style="margin-bottom: 15px;">Enter the unique OTP received on the developer's email.</p>
+            <input type="text" id="otpCode" placeholder="Enter OTP" required>
+            <button class="btn btn-blue" onclick="verifyRegistrationOTP()">Complete Registration</button>
+            <p>Not right now? <a href="#" onclick="showForm('loginForm')" style="color:#6b7280;">Cancel</a></p>
+        </div>
 
+        <div id="forgotForm" class="form-section">
+            <h2>Forgot Password</h2>
+            <p style="margin-bottom: 15px;">Enter your Username/Email to request a password reset OTP.</p>
+            <input type="text" id="forgotUsername" placeholder="Your Unique Username (Email)" required>
+            <button class="btn btn-red" onclick="requestPasswordResetOTP()">Request Reset OTP</button>
+            <p>Back to <a href="#" onclick="showForm('loginForm')" style="color:#6b7280;">Login</a></p>
+        </div>
+
+        <div id="setNewPasswordForm" class="form-section">
+            <h2>Set New Password</h2>
+            <p id="resetOtpPrompt" style="margin-bottom: 15px;">Enter the Reset OTP and your new password.</p>
+            <input type="text" id="resetOtpCode" placeholder="Enter Reset OTP" required>
+            <input type="password" id="newPassword" placeholder="New Password (Min 6 chars)" required>
+            <input type="password" id="confirmNewPassword" placeholder="Confirm New Password" required>
+            <button class="btn btn-red" onclick="submitNewPassword()">Set New Password</button>
+            <p>Back to <a href="#" onclick="showForm('loginForm')" style="color:#6b7280;">Login</a></p>
+        </div>
+
+        <div id="changePasswordForm" class="form-section">
+            <h2>Change Password</h2>
+            <p style="margin-bottom: 15px;">Enter your old and new passwords.</p>
+            <input type="password" id="oldPassword" placeholder="Old Password" required>
+            <input type="password" id="newChangePassword" placeholder="New Password (Min 6 chars)" required>
+            <input type="password" id="confirmNewChangePassword" placeholder="Confirm New Password" required>
+            <button class="btn btn-purple" onclick="changePassword()">Change Password</button>
+            <p>Back to <a href="#" onclick="hideChangePasswordForm()" style="color:#6b7280;">Main App</a></p>
+        </div>
+    </div>
+    
+    <div class="footer-info">
+        <p>Electrical Line Survey App | Version 3.8 (Merged)</p>
+        <p>Developed for Professional Field Use </p>
+        <p>For Support: +91-70187-56182/ErAjay.HPSEB@gmail.com</p>
+        <p>© 2025–26 ErAjay Kumar . All rights reserved.</p>
+    </div>
+    
+</div>
+<div class="container" id="mainAppContainer" style="display:none;">
+    <div class="card">
+        
+     <div id="userControls_Mobile" class="user-controls-mobile-grid">
+            <div class="user-info-stack">
+                <span id="activeUsernameDisplay">--</span>
+                <a href="#" onclick="showChangePasswordForm()">🔑 Change Password</a>
+            </div>
+            <div class="user-action-stack">
+                <a href="#" onclick="logout()" class="logout-link">Log Out</a>
+                <a 
+                    href="#" 
+                    onclick="openManualPopup('https://drive.google.com/file/d/1AtU_U-QRIqjK1npsIydHofihzbMXOD5J/view?usp=drive_link'); return false;" 
+                    class="manual-link"
+                >
+                    📖 User Manual
+                </a>
+            </div>
+        </div>
+
+        <div class="header">
+            <div class="header-left">
+                <div class="icon-box">⚡</div>
+                <div class="title-section">
+                    <h1>Electrical Line Survey V3.8 </h1>
+                    <p>GPS-based line tracking & mapping</p>
+                </div>
+            </div>
+
+            <div class="distance-display">
+                <div class="distance-value" id="totalDistance">0.0m</div>
+                <div class="distance-label">Total Distance (Straight Line)</div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card blue"><div class="stat-label">Points</div><div class="stat-value blue" id="pointsCount">0</div></div>
+            <div class="stat-card green"><div class="stat-label">Markers</div><div class="stat-value green" id="markersCount">0</div></div>
+            <div class="stat-card purple"><div class="stat-label">Accuracy</div><div class="stat-value purple" id="accuracy">--</div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Controls</h2>
+
+        <div class="text-input-group">
+            <label for="siteNameInput">Site Name</label>
+            <input type="text" id="siteNameInput" value="New Survey Site" oninput="updateSiteName(this.value)">
+        </div>
+
+        <div class="selection-group">
+            <label class="selection-group-title">0. Select Survey Type</label>
+            <div class="radio-grid">
+                <div class="radio-group">
+                    <label><input type="radio" name="surveyType" value="proposed" onchange="updateSurveyType(this.value)" checked><span>Proposed Line Survey</span></label>
+                </div>
+                <div class="radio-group">
+                    <label><input type="radio" name="surveyType" value="existing" onchange="updateSurveyType(this.value)"><span>Existing Line Survey</span></label>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-green" id="startBtn" onclick="startTracking()">▶ Start Tracking</button>
+        <button class="btn btn-red" id="stopBtn" onclick="stopTracking()" style="display:none;">⏹ Stop Tracking</button>
+        <div id="gpsStatus" style="margin-top:10px;color:#f97316;font-weight:600;"></div>
+
+        <div style="margin-top:20px;">
+            <div class="selection-group">
+                <label class="selection-group-title">1. Select Line Type</label>
+                <div class="radio-grid" id="lineTypeSelection">
+                    <div class="radio-group"><label><input type="radio" name="lineType" value="HT_33kV" data-main-type="HT" onchange="updateLineSubtype(this.value)"><span>33 KV HT Line</span></label></div>
+                    <div class="radio-group"><label><input type="radio" name="lineType" value="HT_22kV" data-main-type="HT" onchange="updateLineSubtype(this.value)"><span>22 kV HT Line</span></label></div>
+                    <div class="radio-group"><label><input type="radio" name="lineType" value="HT_11kV" data-main-type="HT" onchange="updateLineSubtype(this.value)" checked><span>11 KV HT Line</span></label></div>
+                    <div class="radio-group"><label><input type="radio" name="lineType" value="LT_3P" data-main-type="LT" onchange="updateLineSubtype(this.value)"><span>3-phase LT Line</span></label></div>
+                    <div class="radio-group"><label><input type="radio" name="lineType" value="LT_2P" data-main-type="LT" onchange="updateLineSubtype(this.value)"><span>2-phase LT Line</span></label></div>
+                    <div class="radio-group"><label><input type="radio" name="lineType" value="LT_1P" data-main-type="LT" onchange="updateLineSubtype(this.value)"><span>1-phase LT Line</span></label></div>
+                </div>
+            </div>
+
+           <div class="selection-group">
+                <label class="selection-group-title" for="conductorTypeSelect">
+                    2. Select Conductor Type
+                </label>
+                <select id="conductorTypeSelect" onchange="updateConductorType(this.value)"></select>
+            </div>
+
+            <div class="selection-group">
+                <label class="selection-group-title">
+                    3. Select Marker Type
+                </label>
+
+                <div class="marker-types" id="markerTypeSelection"></div>
+            </div>
+
+
+            <button class="btn btn-blue" id="addMarkerBtn" onclick="addMarker()" disabled style="margin-top:16px;">
+                📍 Add <span id="markerTypeLabel">Pole</span> at Current Location
+            </button>
+        </div>
+    </div> 
+   
+   <div class="card">
+    <h2>Survey Map (Schematic View)</h2>
+    
+    <div class="map-container-wrapper-new"> 
+        
+        <div class="canvas-controls-panel-new">
+            <button class="btn zoom-btn-new" onclick="zoomInCanvas()">
+                +
+            </button>
+            <button class="btn zoom-btn-new" onclick="zoomOutCanvas()">
+                -
+            </button>
+            <button class="btn reset-btn-new" onclick="resetCanvasZoom()">
+                Reset
+            </button>
+        </div>
+
+        <canvas id="mapCanvas" width="800" height="500"></canvas> 
+    </div>
+    
+    </div>
+
+    <div class="card">
+        <h2>Interactive Map View (Leaflet/OSM)</h2>
+        <div id="leafletMap"></div>
+    </div>
+
+    <div class="card">
+        <h2>Actions</h2>
+        <div class="button-grid">
+            <button class="btn btn-green" onclick="saveToJSON()">💾 Save JSON</button>
+            <label class="btn btn-blue">📤 Load JSON<input type="file" accept=".json" onchange="loadFromJSON(event)"></label>
+            <button class="btn btn-purple" onclick="exportToPNG()">📄 Export Main PNG (A3)</button>
+            
+            <button class="btn btn-blue" onclick="exportToCSV()">📊 Export CSV</button>
+            <button class="btn btn-red" onclick="clearAll()">🗑️ Clear All</button>
+        </div>
+    </div>
+
+    <div class="card" id="markersListCard" style="display:none;">
+        <h2>Marked Locations</h2>
+        <div class="markers-list" id="markersList"></div>
+    </div>
+    
+    <div class="footer-info" style="border-top: 1px solid #e5e7eb; background: transparent;">
+        <p>Electrical Line Survey App | Version 3.8 (Merged)</p>
+        <p>Developed for Professional Field Use | For Support: +91-70187-56182/ErAjay.HPSEB@gmail.com</p>
+        <p>© 2025–26 ErAjay Kumar . All rights reserved.</p>
+    </div>
+</div>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
 <script>
-/* ---------------- MAP ---------------- */
-const map = L.map('map').setView([31.60, 76.96], 12);
+    /* =========================================================
+       AUTHENTICATION LOGIC (Google Sheet Backend via Apps Script)
+       <button class="btn btn-purple" onclick="exportToDetailedPNG()">📜 Export Details PNG (A3)</button>
+            <button class="btn btn-purple" onclick="exportLeafletMapToPNG()">🗺️ Export Leaflet PNG</button> 
+       ========================================================= */
 
-const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19
-}).addTo(map);
+    /* CONFIGURED FOR YOUR PROVIDED GAS AND EMAIL */
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyRAet_QK-JSDwEH_PbhzyM_BPDTk7og6578GOWDmgBaz2ddE8D4UE533KLSZ2XUG_2_g/exec';
+    const DEVELOPER_EMAIL = 'ErAjay.HPSEB@gmail.com'; 
 
-const satellite = L.tileLayer(
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  { maxZoom: 19 }
-);
+// ===== CANVAS GLOBALS =====
+let canvas;
+let ctx;
 
-L.control.layers(
-  { "🗺️ Map": osm, "🛰️ Satellite": satellite }
-).addTo(map);
-
-/* ---------------- ICONS BY KVA ---------------- */
-function icon(color){
-  return L.divIcon({
-    html:`<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white"></div>`
-  });
-}
-const kvaIcon = {
-  25: icon("green"),
-  63: icon("blue"),
-  100: icon("orange"),
-  250: icon("red")
+const canvasCamera = {
+  scale: 1,
+  x: 0,
+  y: 0,
+  isDragging: false,
+  lastX: 0,
+  lastY: 0
 };
 
-/* ---------------- DATA ---------------- */
-const locations = [
-  { lat:31.6054808, lng:76.9639604, label:"100 KVA stoh 2nd-1315410314647", kva:100 },
-  { lat:31.6098588, lng:76.9599462, label:"25 KVA Stoh 3rd-1315410314546", kva:25 },
-  { lat:31.5872733, lng:76.9701150, label:"250 KVA khiuri 1st-1315410315657", kva:250 },
-  { lat:31.5907910, lng:76.9516289, label:"63 KVA Bhura 4th-1315410315556", kva:63 },
-  { lat:31.5998891, lng:76.9557079, label:"100 KVA stoh 4th-1315410315354", kva:100 },
-  { lat:31.6048573, lng:76.9594451, label:"100 KVA stoh 1st-1315410315051", kva:100 },
-  { lat:31.6088808, lng:76.9531359, label:"63 KVA Ghatta 3rd-1315410314445", kva:63 },
-  { lat:31.6015198, lng:76.9668138, label:"25 KVA barshala-1315410314849", kva:25 },
-  { lat:31.5947936, lng:76.9573090, label:"25 KVA KEHAD 2ND-1315410313334", kva:25 },
-  { lat:31.5915190, lng:76.9618198, label:"63 KVA NALSAR BHIURA-1315410313637", kva:63 },
-  { lat:31.5887108, lng:76.9541419, label:"63 KVA BHIURA 3RD-1315410313839", kva:63 },
-  { lat:31.6006359, lng:76.9493730, label:"100 KVA BHIURA 1ST-1315410314041", kva:100 },
-  { lat:31.5830256, lng:76.9662600, label:"25 KVA KHURI-1315410312122", kva:25 },
-  { lat:31.5840843, lng:76.9677875, label:"250 KVA KANGRU-1315410312223", kva:250 },
-  { lat:31.5826247, lng:76.9675612, label:"25 KVA JIO MANDIR KANDLOO-1315410312324", kva:25 },
-  { lat:31.5915517, lng:76.9597925, label:"25 KVA CHATYARA-1315410313738", kva:25 },
-  { lat:31.5922828, lng:76.9703533, label:"25 KVA BHARTI AIRTEL BAN LOG TOWER-1315410312526", kva:25 },
-  { lat:31.5997403, lng:76.9780508, label:"63 KVA PIPALOO-1315410312930", kva:63 },
-  { lat:31.6043092, lng:76.9710922, label:"63 KVA CHWARI-1315410313031", kva:63 },
-  { lat:31.5946041, lng:76.9630319, label:"100 KVA KEHAD 1ST-1315410313233", kva:100 },
-  { lat:31.6042353, lng:76.9490378, label:"100 KVA G.H.A GHADROUR-1315410314142", kva:100 },
-  { lat:31.6124838, lng:76.9512566, label:"63 KVA LWSS GHAMBER KHAD-1315410413738", kva:63 },
-  { lat:31.6134075, lng:76.9496180, label:"25 KVA RELIANCE JIO GHATTA-1315410314243", kva:25 },
-  { lat:31.5953240, lng:76.9759677, label:"25 KVA CHAWARI AT RIGGER-1315410312728", kva:25 },
-  { lat:31.5965985, lng:76.9695887, label:"100 KVA RAJGARH 1ST-1315410313132", kva:100 },
-  { lat:31.6096476, lng:76.9491654, label:"100 KVA GHATTA 2ND-1315410314344", kva:100 },
-  { lat:31.5671467, lng:76.9628967, label:"25 KVA LOHARDI KOT-1315410311920", kva:25 },
-  { lat:31.5686417, lng:76.9646700, label:"63 KVA SURANDI KOT-1315410312021", kva:63 },
-  { lat:31.5973463, lng:76.9749273, label:"63 KVA KEHD STOH RIGGAR PUMP-1315410315455", kva:63 },
-  { lat:31.6039864, lng:76.9643332, label:"63 KVA RIGGER PUMP-1315410314748", kva:63 },
-  { lat:31.5984543, lng:76.9430759, label:"63 KVA T-5 (KUMMI PUMP)-1315410412930", kva:63 },
-  { lat:31.6018749, lng:76.9427117, label:"63 KVA 22/0.4 KV T6-1315410413233", kva:63 },
-  { lat:31.6106165, lng:76.9469820, label:"100 KVA KATHYAL CHATARU PUMP-1315410413637", kva:100 },
-  { lat:31.5984997, lng:76.9430075, label:"63 KVA BHIURA 5TH-1315410413031", kva:63 },
-  { lat:31.5992968, lng:76.9400005, label:"100 KVA BHIURA 2ND-1315410413132", kva:100 },
-  { lat:31.6127261, lng:76.9451170, label:"100 KVA CHALI (KUMMI 5)-1315410413435", kva:100 },
-  { lat:31.6148058, lng:76.9483467, label:"100 KVA CHATARU-1315410413536", kva:100 },
-  { lat:31.6087095, lng:76.9459905, label:"63 KVA KHATHYAL-1315410413334", kva:63 }
-];
+let canvasInitialized = false;
 
-/* ---------------- MARKERS ---------------- */
-const markers = [];
 
-locations.forEach(l => {
-  const m = L.marker([l.lat,l.lng],{icon:kvaIcon[l.kva]}).addTo(map);
-  m.bindPopup(`
-    <b>${l.label}</b><br>
-    🔋 ${l.kva} KVA<br><br>
-    <button onclick="navigate(${l.lat},${l.lng})">🧭 Navigate</button>
-  `);
-  m.bindTooltip(`<div class="label">${l.label}</div>`,
-    {permanent:true,direction:"top",offset:[0,-8]}
+
+    const authContainer = document.getElementById('authContainer');
+    const mainAppContainer = document.getElementById('mainAppContainer');
+    const messageDisplay = document.getElementById('messageDisplay');
+    const activeUsernameDisplay = document.getElementById('activeUsernameDisplay');
+
+    let currentSignupUsername = ''; // Holds username (email) during signup
+    let currentSignupPassword = ''; // Holds password during signup
+    let currentResetUsername = ''; // Holds username (email) during reset
+
+
+    function openPaymentPopup() {
+    document.getElementById('paymentPopup').style.display = 'block';
+}
+
+function closePaymentPopup() {
+    document.getElementById('paymentPopup').style.display = 'none';
+}
+
+function copyUPI() {
+    const upi = document.getElementById('upiIdText').innerText;
+    navigator.clipboard.writeText(upi);
+    alert('UPI ID copied successfully ✅');
+}
+async function submitSignupWithPayment() {
+
+    const name = document.getElementById('regName').value.trim();
+    const mobile = document.getElementById('regMobile').value.trim();
+    const email = document.getElementById('registerUsername').value.trim();
+    const password = document.getElementById('registerPassword').value;
+    const confirm = document.getElementById('registerConfirmPassword').value;
+    const paymentId = document.getElementById('regPaymentId').value.trim();
+    const fileInput = document.getElementById('regPaymentProof');
+
+    if (!name || !mobile || !email || !password || !confirm || !paymentId) {
+        return showMessage('All fields are required', 'error');
+    }
+
+    if (password !== confirm) {
+        return showMessage('Passwords do not match', 'error');
+    }
+
+    if (!fileInput.files.length) {
+        return showMessage('Upload payment screenshot', 'error');
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = async function () {
+        const base64 = reader.result.split(',')[1];
+
+        const data = {
+            action: 'SIGNUP_WITH_PAYMENT',
+            email: email,
+            password: password,
+            name: name,
+            mobile: mobile,
+            paymentId: paymentId,
+            paymentProofData: base64,
+            paymentProofFileName: file.name
+        };
+
+        const result = await apiCall(
+            data,
+            'Registration submitted. OTP sent to developer.'
+        );
+
+        if (result) {
+    currentSignupUsername = email;
+
+    document.getElementById('otpCode').value = '';
+    document.getElementById('otpPrompt').innerText =
+        `OTP has been sent to the developer for '${email}'. 
+         Please enter the OTP to activate your account.`;
+
+    showForm('otpVerificationForm');
+}
+
+    };
+
+    reader.readAsDataURL(file);
+}
+
+    // --- Utility Functions ---
+
+    function getDeviceId() {
+        let deviceId = localStorage.getItem('deviceId');
+        if (deviceId) return deviceId;
+        
+        // Generates a simple persistent unique ID for the device/browser
+        deviceId = 'WEB_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+        
+        // NOTE: For a production Capacitor app, you should use the Device plugin to get a true UUID:
+        // const Device = getCapacitorPlugin('Device');
+        // if (Device) { deviceId = await Device.getId(); }
+        
+        localStorage.setItem('deviceId', deviceId);
+        return deviceId;
+    }
+
+    function showForm(id) {
+        document.querySelectorAll('.form-section').forEach(f => f.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        messageDisplay.style.display = 'none';
+        document.getElementById('authContainer').style.display = 'block';
+        document.getElementById('mainAppContainer').style.display = 'none';
+    }
+
+    function showMessage(msg, type = 'info') {
+        messageDisplay.textContent = msg;
+        messageDisplay.className = `msg-${type}`;
+        messageDisplay.style.display = 'block';
+    }
+
+
+    // Leaflet globals (MUST come first)
+let leafletMapInstance = null;
+let leafletMarkers = [];
+let leafletPolylines = [];
+
+
+   function toggleAppView(showMainApp) {
+  if (showMainApp) {
+    authContainer.style.display = 'none';
+    mainAppContainer.style.display = 'block';
+
+    activeUsernameDisplay.textContent =
+      localStorage.getItem('activeUsername');
+
+    // ✅ FIX: init canvas AFTER it becomes visible
+    setTimeout(() => {
+      initCanvas();
+      initLeafletMap();
+    }, 50);
+
+  } else {
+    authContainer.style.display = 'flex';
+    mainAppContainer.style.display = 'none';
+    showForm('loginForm');
+  }
+}
+
+    function checkSession() {
+        const username = localStorage.getItem('activeUsername');
+        if (username) {
+            toggleAppView(true);
+        } else {
+            toggleAppView(false);
+        }
+    }
+
+    function showChangePasswordForm() {
+        authContainer.style.display = 'flex';
+        mainAppContainer.style.display = 'none';
+        showForm('changePasswordForm');
+        document.getElementById('oldPassword').value = '';
+        document.getElementById('newChangePassword').value = '';
+        document.getElementById('confirmNewChangePassword').value = '';
+    }
+
+    function hideChangePasswordForm() {
+        toggleAppView(true); // Go back to main app
+    }
+
+    // --- API Interaction Helper (Updated for your GAS response format) ---
+
+    async function apiCall(data, successMessage) {
+        showMessage('Processing request...', 'info');
+        try {
+            const response = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'cors',
+                cache: 'no-cache',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams(data).toString()
+            });
+            const result = await response.json();
+
+            // CHECK: Your GAS uses 'success: true/false'
+            if (result.success === true) { 
+                showMessage(successMessage || result.message, 'success');
+                return result;
+            } else {
+                showMessage(result.message || 'An unknown error occurred.', 'error');
+                return null;
+            }
+        } catch (error) {
+            console.error('API Call Error:', error);
+            showMessage('Network error or invalid script URL. Check console.', 'error');
+            return null;
+        }
+    }
+
+    // --- Core Authentication Functions ---
+
+    async function loginUser() {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        if (!username || !password) {
+            return showMessage('Please enter both username/email and password.', 'error');
+        }
+
+        const data = {
+            action: 'LOGIN', // Matches code.gs function
+            email: username, // Matches code.gs parameter
+            password: password,
+            deviceId: getDeviceId() // Required for device lock feature
+        };
+
+        const result = await apiCall(data, `Login successful. Welcome, ${username}!`);
+        if (result) {
+            localStorage.setItem('activeUsername', username);
+            toggleAppView(true);
+        }
+    }
+
+    function logout() {
+        if (!confirm('Are you sure you want to log out?')) return;
+        localStorage.removeItem('activeUsername');
+        showMessage('You have been logged out.', 'info');
+        toggleAppView(false);
+    }
+
+    // --- Registration Flow ---
+
+    async function requestSignupOTP() {
+        const username = document.getElementById('registerUsername').value.trim();
+        const password = document.getElementById('registerPassword').value;
+        const confirmPassword = document.getElementById('registerConfirmPassword').value;
+
+        if (!username || !password || !confirmPassword) {
+            return showMessage('Please fill in all fields.', 'error');
+        }
+        if (password.length < 6) {
+            return showMessage('Password must be at least 6 characters long.', 'error');
+        }
+        if (password !== confirmPassword) {
+            return showMessage('Passwords do not match.', 'error');
+        }
+        
+        // Save for the next step
+        currentSignupUsername = username; 
+        currentSignupPassword = password;
+
+        const data = {
+            action: 'SIGNUP', // Matches code.gs function
+            email: username,
+            password: password,
+        };
+
+        const result = await apiCall(data, `OTP requested for '${username}'. Please check the developer email and proceed to verification.`);
+        if (result) {
+            document.getElementById('otpCode').value = '';
+            document.getElementById('otpPrompt').textContent = `Registration OTP for user '${username}' has been sent to the developer (${DEVELOPER_EMAIL}). Enter it below.`;
+            showForm('otpVerificationForm');
+        }
+    }
+
+    async function verifyRegistrationOTP() {
+        const otp = document.getElementById('otpCode').value.trim();
+        const username = currentSignupUsername;
+        
+        if (!username) {
+            return showMessage('Registration flow interrupted. Please restart.', 'error');
+        }
+        if (!otp) {
+            return showMessage('Please enter the OTP.', 'error');
+        }
+
+        const data = {
+            action: 'VERIFY_OTP', // Matches code.gs function
+            email: username,
+            otp: otp
+        };
+
+        const result = await apiCall(data, `Registration for '${username}' complete. You can now log in.`);
+        if (result) {
+            currentSignupUsername = ''; // Clear temporary data
+            currentSignupPassword = '';
+            document.getElementById('loginUsername').value = username;
+            // Password must be entered by user, don't prefill (security best practice)
+            showForm('loginForm');
+        }
+    }
+
+    // --- Password Reset Flow (Forgot Password) ---
+
+    async function requestPasswordResetOTP() {
+        const username = document.getElementById('forgotUsername').value.trim();
+        if (!username) {
+            return showMessage('Please enter your username/email.', 'error');
+        }
+
+        currentResetUsername = username;
+
+        const data = {
+            action: 'RESET_REQUEST', // Matches code.gs function
+            email: username,
+            developerEmail: DEVELOPER_EMAIL
+        };
+
+        const result = await apiCall(data, `Password reset OTP requested for '${username}'. Ask the developer for the code.`);
+        if (result) {
+            document.getElementById('resetOtpCode').value = '';
+            document.getElementById('resetOtpPrompt').textContent = `Reset OTP for user '${username}' has been sent to the developer. Enter it and a new password below.`;
+            showForm('setNewPasswordForm');
+        }
+    }
+
+    async function submitNewPassword() {
+        const otp = document.getElementById('resetOtpCode').value.trim();
+        const username = currentResetUsername;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+        
+        if (!username) {
+            return showMessage('Reset flow interrupted. Please restart.', 'error');
+        }
+        if (!otp || !newPassword || !confirmNewPassword) {
+            return showMessage('Please fill in all fields (OTP and new passwords).', 'error');
+        }
+        if (newPassword.length < 6) {
+            return showMessage('New password must be at least 6 characters long.', 'error');
+        }
+        if (newPassword !== confirmNewPassword) {
+            return showMessage('New passwords do not match.', 'error');
+        }
+
+        const data = {
+            action: 'RESET_VERIFY', // Matches code.gs function
+            email: username,
+            otp: otp,
+            newPassword: newPassword // Matches code.gs parameter
+        };
+
+        const result = await apiCall(data, `Password successfully reset for '${username}'. Please log in.`);
+        if (result) {
+            currentResetUsername = ''; // Clear temporary data
+            document.getElementById('loginUsername').value = username;
+            document.getElementById('loginPassword').value = newPassword;
+            showForm('loginForm');
+        }
+    }
+
+    // --- Password Change (In-App) ---
+    async function changePassword() {
+        const username = localStorage.getItem('activeUsername');
+        const oldPassword = document.getElementById('oldPassword').value;
+        const newPassword = document.getElementById('newChangePassword').value;
+        const confirmNewPassword = document.getElementById('confirmNewChangePassword').value;
+
+        if (!username || !oldPassword || !newPassword || !confirmNewPassword) {
+            return showMessage('Please fill in all fields.', 'error');
+        }
+        if (newPassword.length < 6) {
+            return showMessage('New password must be at least 6 characters long.', 'error');
+        }
+        if (newPassword !== confirmNewPassword) {
+            return showMessage('New passwords do not match.', 'error');
+        }
+        if (oldPassword === newPassword) {
+            return showMessage('New password cannot be the same as the old password.', 'error');
+        }
+
+        const data = {
+            action: 'CHANGE_PASSWORD', // Matches code.gs function
+            email: username,
+            oldPassword: oldPassword,
+            newPassword: newPassword
+        };
+        
+        // Use a temp message display for the password change process
+        const authCardMsg = document.querySelector('#authContainer #messageDisplay');
+        authCardMsg.textContent = 'Processing request...';
+        authCardMsg.className = 'msg-info';
+        authCardMsg.style.display = 'block';
+
+        const result = await apiCall(data, `Password successfully changed for ${username}.`);
+        
+        // Hide the message after a brief pause
+        setTimeout(() => { authCardMsg.style.display = 'none'; }, 3000);
+        
+        if (result) {
+            hideChangePasswordForm();
+        }
+    }
+
+
+    /* =========================================================
+       EXISTING MAIN APP LOGIC (V3.8) - APPENDED/INTEGRATED BELOW
+       ========================================================= */
+
+    
+   
+        /* ---------------------------
+           Capacitor helpers / state
+           --------------------------- */
+        const isCapacitorNative = () => {
+          try { return !!(window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() !== 'web'); }
+          catch (e) { return false; }
+        };
+        const getCapacitorPlugin = (name) => {
+          try { return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name] ? window.Capacitor.Plugins[name] : null; }
+          catch (e) { return null; }
+        };
+        function blobToBase64(blob) {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = reject;
+            reader.onload = () => { const dataUrl = reader.result; resolve(dataUrl.split(',')[1]); };
+            reader.readAsDataURL(blob);
+          });
+        }
+        async function saveFileNativeFallback(filename, blob, mimeType) {
+          const Filesystem = getCapacitorPlugin('Filesystem');
+          if (Filesystem) {
+            try {
+              const base64 = await blobToBase64(blob);
+              const dirs = ['DOCUMENTS','DATA','EXTERNAL','APPLICATION'];
+              for (const d of dirs) {
+                try {
+                  await Filesystem.writeFile({ path: filename, data: base64, directory: d, recursive: true });
+                  alert(`Saved to device storage (${d}): ${filename}`);
+                  return;
+                } catch (e) { /* try next */ }
+              }
+            } catch (e) { console.error('Native write fallback error:', e); }
+          }
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
+          alert('File downloaded (web fallback).');
+        }
+
+        /* ---------------------------
+           V3.8 dynamic configs/state
+           --------------------------- */
+        let isTracking = false, isManualPosition = false, linePoints = [], markers = [], totalDistance = 0;
+        let currentPosition = null, siteName = document.getElementById('siteNameInput').value, selectedMarkerType = 'single_pole';
+        let accuracy = null, watchId = null, startFromMarkerIndex = null, startFromMarkerPosition = null;
+        let selectedLineMainType = 'HT', selectedLineSubtype = 'HT_11kV', selectedConductorType = 'ACSR_6_1_472', selectedSurveyType = 'proposed';
+        let initialFixAttempt = false, initialFixTimeoutId = null;
+        const MIN_MOVEMENT_DISTANCE = 2.0, MAX_ACCURACY_ERROR = 10.0, ACCURACY_THRESHOLD = 10.0, INITIAL_FIX_TIMEOUT = 30000;
+        let canvasZoomScale = 1.0; // 1.0 is the default (fit-to-bounds) zoom level
+        /* Configs (copied from ios v3.8) */
+        const lineConfig = {
+          'HT_33kV': { label: '33 kV HT Line', color: '#dc2626', mainType: 'HT' },
+          'HT_22kV': { label: '22 kV HT Line', color: '#f97316', mainType: 'HT' },
+          'HT_11kV': { label: '11 kV HT Line', color: '#facc15', mainType: 'HT' },
+          'LT_3P': { label: '3-phase LT Line', color: '#2563eb', mainType: 'LT' },
+          'LT_2P': { label: '2-phase LT Line', color: '#059669', mainType: 'LT' },
+          'LT_1P': { label: '1-phase LT Line', color: '#a855f7', mainType: 'LT' }
+        };
+        const conductorConfig = {
+          'ACSR_6_1_259': { label: 'Bare ACSR 6/1/2.59', group: 'Bare', color: '#6b7280' },
+          'ACSR_6_1_335': { label: 'Bare ACSR 6/1/3.35', group: 'Bare', color: '#6b7280' },
+          'ACSR_6_1_472': { label: 'Bare ACSR 6/1/4.72', group: 'Bare', color: '#6b7280' },
+          'AAAC_7_250': { label: 'Bare AAAC 7/2.50', group: 'Bare', color: '#4b5563' },
+          'AAAC_7_315': { label: 'Bare AAAC 7/3.15', group: 'Bare', color: '#4b5563' },
+          'AAAC_7_381': { label: 'Bare AAAC 7/3.81', group: 'Bare', color: '#4b5563' },
+          'AAAC_7_426': { label: 'Bare AAAC 7/4.26', group: 'Bare', color: '#4b5563' },
+          'XLPE_35': { label: 'Insulated XLPE/AB Cable 35sqmm', group: 'Insulated', color: '#10b981' },
+          'XLPE_50': { label: 'Insulated XLPE/AB Cable 50sqmm', group: 'Insulated', color: '#10b981' },
+          'XLPE_70': { label: 'Insulated XLPE/AB Cable 70sqmm', group: 'Insulated', color: '#10b981' },
+          'XLPE_95': { label: 'Insulated XLPE/AB Cable 95sqmm', group: 'Insulated', color: '#10b981' },
+          'XLPE_120': { label: 'Insulated XLPE/AB Cable 120sqmm', group: 'Insulated', color: '#059669' },
+          'XLPE_185': { label: 'Insulated XLPE/AB Cable 185sqmm', group: 'Insulated', color: '#059669' }
+        };
+        const markerConfig = {
+          'dtr': { label: 'DTR', icon: '☢', mainType: ['HT','LT'], color: '#ef4444' },
+          'single_pole': { label: 'Single Pole', icon: '◯', mainType: ['HT','LT'], color: '#3b82f6' },
+          'double_pole': { label: 'Double Pole', icon: '◯◯', mainType: ['HT'], color: '#a855f7' },
+          'three_pole': { label: '3-Pole', icon: '◰', mainType: ['HT'], color: '#f59e0b' },
+          'four_pole': { label: '4-Pole', icon: '◱', mainType: ['HT'], color: '#00704a' }
+        };
+
+        /* UI helpers & math */
+        function toRadians(deg){ return deg * Math.PI / 180; }
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+          const R = 6371000;
+          const phi1 = toRadians(lat1), phi2 = toRadians(lat2);
+          const dPhi = toRadians(lat2 - lat1), dLambda = toRadians(lon2 - lon1);
+          const a = Math.sin(dPhi/2)*Math.sin(dPhi/2) + Math.cos(phi1)*Math.cos(phi2)*Math.sin(dLambda/2)*Math.sin(dLambda/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          return R * c;
+        }
+        function updateTotalDistance(){
+          totalDistance = 0;
+          if (markers.length > 0) {
+            totalDistance = markers.reduce((sum, m) => sum + (m.spanLength || 0), 0);
+          } else if (linePoints.length > 1) {
+            for (let i=1;i<linePoints.length;i++){
+              totalDistance += calculateDistance(linePoints[i-1].lat,linePoints[i-1].lng,linePoints[i].lat,linePoints[i].lng);
+            }
+          }
+          document.getElementById('totalDistance').textContent = `${totalDistance.toFixed(1)}m`;
+        }
+        function updateUI(){
+          document.getElementById('pointsCount').textContent = linePoints.length;
+          document.getElementById('markersCount').textContent = markers.length;
+          document.getElementById('accuracy').textContent = accuracy !== null ? `±${accuracy.toFixed(1)}m` : '--';
+          document.getElementById('markerTypeLabel').textContent = markerConfig[selectedMarkerType] ? markerConfig[selectedMarkerType].label : 'Marker';
+        }
+
+        /* ---------------------------
+           Dynamic UI: marker types & conductors
+           --------------------------- */
+        const markerTypeSelectionElement = document.getElementById('markerTypeSelection');
+        const conductorTypeSelectElement = document.getElementById('conductorTypeSelect');
+        const listCard = document.getElementById('markersListCard');
+        const list = document.getElementById('markersList');
+        const gpsStatusElement = document.getElementById('gpsStatus');
+
+        function updateSiteName(name) { siteName = name; drawMap(); updateUI(); }
+        function updateSurveyType(type) { selectedSurveyType = type; drawMap(); drawLeafletMap(); }
+
+        function updateLineSubtype(value) {
+          const cfg = lineConfig[value];
+          if (!cfg) return;
+          selectedLineSubtype = value;
+          selectedLineMainType = cfg.mainType;
+          populateConductorType();
+          updateMarkerSelectors();
+          drawMap();
+          drawLeafletMap();
+        }
+        function updateConductorType(value) { selectedConductorType = value; drawMap(); drawLeafletMap(); }
+
+        function selectMarkerType(type) {
+          selectedMarkerType = type;
+          document.querySelectorAll('.marker-btn').forEach(btn => btn.classList.remove('active'));
+          document.querySelectorAll('.marker-btn').forEach(btn => {
+            if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${type}'`)) {
+              btn.classList.add('active');
+            }
+          });
+          updateUI();
+        }
+
+        function updateMarkerSelectors() {
+          markerTypeSelectionElement.innerHTML = '';
+          let firstMarkerKey = null;
+          for (const [key, cfg] of Object.entries(markerConfig)) {
+            if (cfg.mainType.includes(selectedLineMainType)) {
+              if (firstMarkerKey === null) firstMarkerKey = key;
+              const isActive = (key === selectedMarkerType);
+              const button = document.createElement('button');
+              button.className = `marker-btn ${isActive ? 'active' : ''}`;
+              button.setAttribute('onclick', `selectMarkerType('${key}')`);
+              button.innerHTML = `<div class="marker-icon">${cfg.icon}</div><div class="marker-label">${cfg.label}</div>`;
+              markerTypeSelectionElement.appendChild(button);
+            }
+          }
+          if (!markerConfig[selectedMarkerType] || !markerConfig[selectedMarkerType].mainType.includes(selectedLineMainType)) {
+            selectedMarkerType = firstMarkerKey || 'dtr';
+            selectMarkerType(selectedMarkerType);
+          }
+          drawMap();
+          drawLeafletMap();
+        }
+
+        function populateConductorType() {
+          conductorTypeSelectElement.innerHTML = '';
+          const currentLineType = lineConfig[selectedLineSubtype];
+          const isLT = currentLineType && currentLineType.mainType === 'LT';
+          let firstOption = null;
+          for (const [key, cfg] of Object.entries(conductorConfig)) {
+            // Simple filtering — keep all for now but prioritize sensible defaults
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = cfg.label;
+            if (!firstOption) firstOption = key;
+            conductorTypeSelectElement.appendChild(option);
+          }
+          if (!conductorTypeSelectElement.value && firstOption) {
+            conductorTypeSelectElement.value = firstOption;
+            selectedConductorType = firstOption;
+          }
+        }
+
+        /* ---------------------------
+           Drawing functions (copied exactly from your Android working file)
+           --------------------------- */
+
+        function offsetLatLng(lat, lng, east, north) {
+          const R = 6378137;
+          const dLat = north / R;
+          const dLng = east / (R * Math.cos(Math.PI * lat / 180));
+          return {
+            lat: lat + dLat * 180 / Math.PI,
+            lng: lng + dLng * 180 / Math.PI
+          };
+        }
+      
+
+        function zoomInCanvas() {
+  canvasCamera.scale = Math.min(canvasCamera.scale * 1.2, 6);
+  drawMap();
+}
+
+function zoomOutCanvas() {
+  canvasCamera.scale = Math.max(canvasCamera.scale / 1.2, 0.2);
+  drawMap();
+}
+
+function resetCanvasZoom() {
+  canvasInitialized = false;
+  drawMap();
+}
+
+
+function initCanvas() {
+  canvas = document.getElementById('mapCanvas');
+  if (!canvas) return;
+
+  ctx = canvas.getContext('2d');
+
+  // Match canvas resolution to CSS size
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+
+  canvasInitialized = false; // 🔑 IMPORTANT
+  drawMap();
+}
+
+
+function drawMap() {
+  if (!canvas || !ctx) return; // ⛑️ safety guard
+
+  const width = canvas.width;
+  const height = canvas.height;
+  const GRID_SIZE = canvasCamera.scale > 3 ? 20 : 10;
+
+  ctx.save();
+
+  /* ================= BACKGROUND ================= */
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#f0f9ff';
+  ctx.fillRect(0, 0, width, height);
+
+  /* ================= HEADER (SCREEN FIXED) ================= */
+  ctx.fillStyle = '#1f2937';
+  ctx.font = 'bold 18px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText(`Site: ${siteName}`, 10, 25);
+  ctx.font = '14px Arial';
+  ctx.fillText(
+    `Survey Type: ${selectedSurveyType === 'proposed' ? 'Proposed Line Survey' : 'Existing Line Survey'}`,
+    10,
+    45
   );
-  markers.push({marker:m,text:l.label.toLowerCase()});
-});
 
-map.fitBounds(markers.map(m=>m.marker.getLatLng()));
+  /* ================= COLLECT POINTS ================= */
+  const pointsForBounds = [...markers, ...linePoints];
+  if (currentPosition && isManualPosition) pointsForBounds.push(currentPosition);
+  if (startFromMarkerPosition) pointsForBounds.push(startFromMarkerPosition);
 
-/* ---------------- SEARCH ---------------- */
-document.getElementById("searchBox").addEventListener("input",e=>{
-  const q=e.target.value.toLowerCase();
-  markers.forEach(m=>{
-    if(m.text.includes(q)){
-      m.marker.addTo(map);
+  if (pointsForBounds.length === 0) {
+    ctx.fillStyle = '#64748b';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Start tracking or add markers to see map', width / 2, height / 2);
+    ctx.restore();
+    return;
+  }
+
+  const lats = pointsForBounds.map(p => p.lat);
+  const lngs = pointsForBounds.map(p => p.lng);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+
+  /* ================= INITIAL FIT ================= */
+  if (!canvasInitialized) {
+    const padding = 80;
+    const latRange = maxLat - minLat || 0.001;
+    const lngRange = maxLng - minLng || 0.001;
+
+    canvasCamera.scale = Math.min(
+      (width - padding * 2) / lngRange,
+      (height - padding * 2) / latRange
+    );
+    canvasCamera.x = padding;
+    canvasCamera.y = height - padding;
+
+    canvasInitialized = true;
+  }
+
+  /* ================= WORLD → SCREEN ================= */
+  const scale = canvasCamera.scale;
+  const toX = lng => canvasCamera.x + (lng - minLng) * scale;
+  const toY = lat => canvasCamera.y - (lat - minLat) * scale;
+
+  /* ================= GRID ================= */
+  const origin = { lat: minLat, lng: minLng };
+  const offsetN = offsetLatLng(origin.lat, origin.lng, 0, GRID_SIZE);
+  const offsetE = offsetLatLng(origin.lat, origin.lng, GRID_SIZE, 0);
+  const latStep = offsetN.lat - origin.lat;
+  const lngStep = offsetE.lng - origin.lng;
+
+  ctx.strokeStyle = 'rgba(150,150,150,0.4)';
+  ctx.lineWidth = 0.5;
+
+  for (let lat = minLat - (maxLat - minLat); lat <= maxLat + (maxLat - minLat); lat += latStep) {
+    ctx.beginPath();
+    ctx.moveTo(0, toY(lat));
+    ctx.lineTo(width, toY(lat));
+    ctx.stroke();
+  }
+
+  for (let lng = minLng - (maxLng - minLng); lng <= maxLng + (maxLng - minLng); lng += lngStep) {
+    ctx.beginPath();
+    ctx.moveTo(toX(lng), 0);
+    ctx.lineTo(toX(lng), height);
+    ctx.stroke();
+  }
+
+  /* ================= LINES ================= */
+  const dash = selectedSurveyType === 'proposed' ? [10, 5] : [];
+
+  if (markers.length > 1) {
+    for (let i = 1; i < markers.length; i++) {
+      const a = markers[i - 1];
+      const b = markers[i];
+      ctx.strokeStyle = lineConfig[b.lineSubtype]?.color || '#3b82f6';
+      ctx.lineWidth = 3;
+      ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(toX(a.lng), toY(a.lat));
+      ctx.lineTo(toX(b.lng), toY(b.lat));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  /* ================= MARKERS ================= */
+  markers.forEach((m, i) => {
+    const color = m.type === 'dtr'
+      ? markerConfig.dtr.color
+      : lineConfig[m.lineSubtype]?.color || '#3b82f6';
+
+    const x = toX(m.lng);
+    const y = toY(m.lat);
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, 15, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(markerConfig[m.type].icon, x, y);
+
+    ctx.fillStyle = '#1f2937';
+    ctx.font = 'bold 12px Arial';
+    ctx.fillText(i + 1, x + 18, y - 10);
+  });
+
+  /* ================= CURRENT POSITION ================= */
+  if (currentPosition) {
+    ctx.fillStyle = isManualPosition ? '#a855f7' : '#10b981';
+    ctx.beginPath();
+    ctx.arc(toX(currentPosition.lng), toY(currentPosition.lat), isManualPosition ? 10 : 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+
+       
+        let mapTiles = null;
+        let satelliteTiles = null;
+
+    function initLeafletMap() {
+    let centerLat = 31.7831;
+    let centerLng = 76.9926;
+    if (markers.length > 0) {
+    centerLat = markers[0].lat;
+    centerLng = markers[0].lng;
+    } else if (currentPosition) {
+    centerLat = currentPosition.lat;
+    centerLng = currentPosition.lng;
+    }
+
+    if (leafletMapInstance) {
+    leafletMapInstance.remove();
+    }
+
+    leafletMapInstance = L.map('leafletMap').setView([centerLat, centerLng], 15);
+
+    satelliteTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri'
+    }).addTo(leafletMapInstance);
+
+    mapTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+    });
+
+    const baseMaps = {
+    "Satellite View": satelliteTiles,
+    "Street Map": mapTiles
+    };
+    L.control.layers(baseMaps).addTo(leafletMapInstance);
+
+    drawLeafletMap();
+    }
+
+    function drawLeafletMap() {
+    if (!leafletMapInstance) {
+    initLeafletMap();
+    return;
+    }
+
+    leafletMarkers.forEach(m => m.remove());
+    leafletMarkers = [];
+    leafletPolylines.forEach(p => p.remove());
+    leafletPolylines = [];
+
+    let segmentCoordinates = [];
+    let currentSegmentColor = lineConfig[selectedLineSubtype] ? lineConfig[selectedLineSubtype].color : '#3b82f6';
+
+    const isProposed = selectedSurveyType === 'proposed';
+    const dashArray = isProposed ? '8, 8' : null; // Solid line if existing, dotted if proposed
+
+    for (let i = 0; i < markers.length; i++) {
+    const marker = markers[i];
+    const markerLineConfig = lineConfig[marker.lineSubtype] || { color: '#3b82f6' };
+
+    if (i > 0) {
+    const prevMarker = markers[i - 1];
+
+    if (!marker.isLineBreak) {
+    segmentCoordinates.push([marker.lat, marker.lng]);
+
+    let nextSegmentColor = markerLineConfig.color;
+
+    if (nextSegmentColor !== currentSegmentColor || i === markers.length - 1) {
+    const polyline = L.polyline(segmentCoordinates, {
+    color: currentSegmentColor,
+    weight: 4,
+    opacity: 1.0,
+    dashArray: dashArray // Apply line style
+    }).addTo(leafletMapInstance);
+    leafletPolylines.push(polyline);
+
+    if (nextSegmentColor !== currentSegmentColor) {
+    segmentCoordinates = [[prevMarker.lat, prevMarker.lng], [marker.lat, marker.lng]];
+    currentSegmentColor = nextSegmentColor;
+    }
+    }
     } else {
-      map.removeLayer(m.marker);
+    if (marker.startFromMarkerId) {
+    const startMarker = markers.find(m => m.id === marker.startFromMarkerId);
+    if (startMarker) {
+    const jumpLine = L.polyline(
+    [[startMarker.lat, startMarker.lng], [marker.lat, marker.lng]],
+    {
+    color: markerLineConfig.color,
+    weight: 4,
+    opacity: 1.0,
+    dashArray: dashArray // Apply line style for jump span
+    }
+    ).addTo(leafletMapInstance);
+    leafletPolylines.push(jumpLine);
+    }
+    }
+
+    segmentCoordinates = [[marker.lat, marker.lng]];
+    currentSegmentColor = markerLineConfig.color;
+    }
+    } else {
+    segmentCoordinates.push([marker.lat, marker.lng]);
+    currentSegmentColor = markerLineConfig.color;
+    }
+
+    if (i === markers.length - 1 && segmentCoordinates.length > 1) {
+    const polyline = L.polyline(segmentCoordinates, {
+    color: currentSegmentColor,
+    weight: 4,
+    opacity: 1.0,
+    dashArray: dashArray // Apply line style for final segment
+    }).addTo(leafletMapInstance);
+    leafletPolylines.push(polyline);
+    }
+    }
+
+    if (startFromMarkerPosition && currentPosition) {
+    const previewLine = L.polyline(
+    [[startFromMarkerPosition.lat, startFromMarkerPosition.lng],
+    [currentPosition.lat, currentPosition.lng]],
+    {
+    color: '#a855f7',
+    weight: 3,
+    opacity: 0.7,
+    dashArray: '5, 10'
+    }
+    ).addTo(leafletMapInstance);
+    leafletPolylines.push(previewLine);
+    }
+
+    markers.forEach((marker, idx) => {
+    const type = markerConfig[marker.type] || { label: 'Unknown', icon: '❓' };
+    const line = lineConfig[marker.lineSubtype] || { label: 'Unknown Line', color: '#3b82f6' };
+    const conductor = conductorConfig[marker.conductorType] || { label: 'Unknown Conductor' };
+    const markerNumber = idx + 1;
+
+    let markerColor = line.color;
+    if (marker.type === 'dtr') {
+    markerColor = markerConfig.dtr.color;
+    }
+
+    const spanText = (idx > 0 && marker.spanLength && !marker.isLineBreak) ? `${marker.spanLength.toFixed(0)}m Span` : (marker.isLineBreak && marker.spanLength > 0 ? `${marker.spanLength.toFixed(0)}m Span (Jump)` : marker.isLineBreak ? 'New Segment Start' : '');
+
+    const markerIcon = L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="background-color: ${markerColor}; border: 3px solid white; color: white; border-radius: 50%; width: 30px; height: 30px; line-height: 25px; text-align: center; font-weight: bold; font-size: 14px;">${markerNumber}</div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15]
+    });
+
+    const lMarker = L.marker([marker.lat, marker.lng], {
+    icon: markerIcon,
+    title: `${type.label} #${markerNumber}`
+    }).addTo(leafletMapInstance);
+
+    lMarker.bindPopup(`
+    <div style="font-family: Arial; padding: 5px;">
+    <strong>${type.label} #${markerNumber}</strong><br>
+    Survey: ${marker.surveyType === 'proposed' ? 'Proposed' : 'Existing'}<br>
+    Line: ${line.label}<br>
+    Conductor: ${conductor.label}<br>
+    Lat: ${marker.lat.toFixed(6)}, Lng: ${marker.lng.toFixed(6)}<br>
+    ${spanText}
+    </div>
+    `);
+
+    leafletMarkers.push(lMarker);
+    });
+
+    if (currentPosition) {
+    let currentMarker;
+    if (isManualPosition) {
+    currentMarker = L.circleMarker([currentPosition.lat, currentPosition.lng], {
+    radius: 8,
+    color: '#a855f7',
+    fillColor: '#a855f7',
+    fillOpacity: 1,
+    weight: 3
+    }).bindPopup('Manual Start Location').addTo(leafletMapInstance);
+    } else {
+    currentMarker = L.circleMarker([currentPosition.lat, currentPosition.lng], {
+    radius: 5,
+    color: '#ffffff',
+    fillColor: '#10b981',
+    fillOpacity: 1,
+    weight: 2
+    }).bindPopup(`Live GPS: ±${accuracy.toFixed(1)}m`).addTo(leafletMapInstance);
+    }
+    leafletMarkers.push(currentMarker);
+    }
+
+    if (markers.length > 0) {
+    const allLatLngs = markers.map(m => [m.lat, m.lng]);
+    if (currentPosition) allLatLngs.push([currentPosition.lat, currentPosition.lng]);
+    if (startFromMarkerPosition) allLatLngs.push([startFromMarkerPosition.lat, startFromMarkerPosition.lng]);
+
+    if (allLatLngs.length > 1) {
+    leafletMapInstance.fitBounds(allLatLngs, { padding: [30, 30] });
+    } else if (allLatLngs.length === 1) {
+    leafletMapInstance.setView(allLatLngs[0], 17);
+    }
+    }
+    }
+
+        /* ---------------------------
+           Tracking & marker logic (merged)
+           --------------------------- */
+
+        async function requestGeolocationPermissionIfNeeded() {
+          try {
+            const Geolocation = getCapacitorPlugin('Geolocation');
+            if (Geolocation && Geolocation.requestPermissions) {
+              await Geolocation.requestPermissions();
+              return;
+            }
+            if (navigator.permissions) {
+              try { await navigator.permissions.query({ name: 'geolocation' }); } catch(e){}
+            }
+          } catch (e) {}
+        }
+
+        async function startTracking() {
+          await requestGeolocationPermissionIfNeeded();
+
+          if (!navigator.geolocation && !getCapacitorPlugin('Geolocation')) {
+            alert('Geolocation is not supported by this platform.');
+            return;
+          }
+
+          isTracking = true; isManualPosition = false; startFromMarkerIndex = null; startFromMarkerPosition = null; initialFixAttempt = true;
+          document.getElementById('startBtn').style.display = 'none';
+          document.getElementById('stopBtn').style.display = 'flex';
+          document.getElementById('addMarkerBtn').disabled = true;
+          gpsStatusElement.textContent = 'Searching for high-accuracy GPS fix...';
+          gpsStatusElement.style.color = '#f97316';
+
+          initialFixTimeoutId = setTimeout(() => {
+            if (initialFixAttempt) {
+              gpsStatusElement.textContent = 'Warning: Low accuracy after 30 seconds. Proceeding with current accuracy.';
+              gpsStatusElement.style.color = '#dc2626';
+              document.getElementById('addMarkerBtn').disabled = false;
+              initialFixAttempt = false;
+            }
+          }, INITIAL_FIX_TIMEOUT);
+
+          const Geolocation = getCapacitorPlugin('Geolocation');
+          if (Geolocation && Geolocation.watchPosition) {
+            try {
+              watchId = await Geolocation.watchPosition({ enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }, (position, err) => {
+                if (err) { console.error('Native watch error', err); gpsStatusElement.textContent = `GPS Error: ${err}`; gpsStatusElement.style.color = '#dc2626'; stopTracking(); return; }
+                if (!position || !position.coords) return;
+                handleNewPosition({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy });
+              });
+            } catch (e) { console.warn('Native watch failed, falling back to browser', e); startTrackingBrowser(); }
+          } else startTrackingBrowser();
+        }
+
+        function startTrackingBrowser() {
+          if (!navigator.geolocation) { alert('Geolocation not supported in this browser.'); return; }
+          watchId = navigator.geolocation.watchPosition((position) => {
+            handleNewPosition({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy });
+          }, (error) => {
+            console.error('Error getting location:', error);
+            gpsStatusElement.textContent = `GPS Error: ${error.message}`;
+            gpsStatusElement.style.color = '#dc2626';
+            alert('Error getting location. Please enable GPS.');
+            stopTracking();
+          }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+        }
+
+        function handleNewPosition(pos) {
+          accuracy = pos.accuracy;
+          if (initialFixAttempt) {
+            if (accuracy <= ACCURACY_THRESHOLD) {
+              clearTimeout(initialFixTimeoutId); initialFixAttempt = false;
+              document.getElementById('addMarkerBtn').disabled = false;
+              gpsStatusElement.textContent = `GPS Fix Achieved: ±${accuracy.toFixed(1)}m`;
+              gpsStatusElement.style.color = '#10b981';
+            } else {
+              gpsStatusElement.textContent = `Searching for high-accuracy GPS fix... (Current: ±${accuracy.toFixed(1)}m)`;
+              updateUI(); return;
+            }
+          }
+          if (accuracy > MAX_ACCURACY_ERROR) { console.warn('Point skipped due to poor accuracy:', accuracy); updateUI(); return; }
+          const newPoint = { lat: pos.latitude, lng: pos.longitude, timestamp: Date.now() };
+          if (linePoints.length > 0) {
+            const lastPoint = linePoints[linePoints.length - 1];
+            const distanceMoved = calculateDistance(lastPoint.lat, lastPoint.lng, newPoint.lat, newPoint.lng);
+            if (distanceMoved < MIN_MOVEMENT_DISTANCE) { currentPosition = newPoint; updateUI(); return; }
+          }
+          currentPosition = newPoint; linePoints.push(newPoint);
+          updateTotalDistance(); updateUI(); try{ drawMap(); }catch(e){} try{ drawLeafletMap(); }catch(e){}
+        }
+
+        function stopTracking() {
+          const Geolocation = getCapacitorPlugin('Geolocation');
+          if (Geolocation && Geolocation.clearWatch && typeof watchId !== 'undefined') {
+            try { Geolocation.clearWatch({ id: watchId }); } catch(e){}
+          }
+          if (watchId && navigator.geolocation && navigator.geolocation.clearWatch) navigator.geolocation.clearWatch(watchId);
+          watchId = null; clearTimeout(initialFixTimeoutId); initialFixAttempt = false; isTracking = false; isManualPosition = false; startFromMarkerIndex = null; startFromMarkerPosition = null;
+          document.getElementById('startBtn').style.display = 'flex'; document.getElementById('stopBtn').style.display = 'none'; document.getElementById('addMarkerBtn').disabled = true;
+          gpsStatusElement.textContent = 'Tracking stopped.'; gpsStatusElement.style.color = '#6b7280';
+        }
+
+        function startFromMarker(id) {
+          const markerIndex = markers.findIndex(m => m.id == id);
+          if (markerIndex === -1) return;
+          const marker = markers[markerIndex];
+          startFromMarkerIndex = markerIndex;
+          startFromMarkerPosition = { lat: marker.lat, lng: marker.lng };
+          if (!isTracking) {
+            isTracking = true; initialFixAttempt = false;
+            document.getElementById('startBtn').style.display = 'none'; document.getElementById('stopBtn').style.display = 'flex'; document.getElementById('addMarkerBtn').disabled = false;
+            gpsStatusElement.textContent = 'Starting GPS tracking...'; gpsStatusElement.style.color = '#f97316';
+            startTracking();
+          } else {
+            gpsStatusElement.textContent = `Starting from Marker #${markerIndex + 1}. Move to your new location and click "Add Marker".`; gpsStatusElement.style.color = '#a855f7';
+          }
+          updateMarkersList(); drawMap(); drawLeafletMap();
+        }
+
+        function addMarker() {
+          if (!currentPosition && !startFromMarkerPosition) { alert('Waiting for GPS position...'); return; }
+          const positionToUse = currentPosition || startFromMarkerPosition;
+          if (!positionToUse) { alert('No position available.'); return; }
+
+          const newMarker = {
+            id: Date.now(),
+            type: selectedMarkerType,
+            poleType: (selectedMarkerType === 'single_pole' || selectedMarkerType === 'double_pole' || selectedMarkerType === 'dtr') ? (window.selectedPoleType || 'HT') : null,
+            lineMainType: selectedLineMainType,
+            lineSubtype: selectedLineSubtype,
+            conductorType: selectedConductorType,
+            surveyType: selectedSurveyType,
+            lat: positionToUse.lat,
+            lng: positionToUse.lng,
+            timestamp: Date.now(),
+            spanLength: 0,
+            isLineBreak: false,
+            startFromMarkerId: null
+          };
+
+          if (startFromMarkerIndex !== null && startFromMarkerPosition) {
+            newMarker.isLineBreak = true;
+            const spanDistance = calculateDistance(startFromMarkerPosition.lat, startFromMarkerPosition.lng, newMarker.lat, newMarker.lng);
+            newMarker.spanLength = spanDistance;
+            newMarker.startFromMarkerId = markers[startFromMarkerIndex].id;
+            startFromMarkerIndex = null; startFromMarkerPosition = null;
+          } else if (markers.length > 0) {
+            const lastMarker = markers[markers.length - 1];
+            newMarker.spanLength = calculateDistance(lastMarker.lat, lastMarker.lng, newMarker.lat, newMarker.lng);
+          }
+
+          markers.push(newMarker);
+          // Recalculate spans & totals
+          updateTotalDistance();
+          updateUI();
+          drawMap();
+          drawLeafletMap();
+          updateMarkersList();
+
+          gpsStatusElement.textContent = 'Marker added successfully.'; gpsStatusElement.style.color = '#10b981';
+
+          if (isManualPosition) {
+            isManualPosition = false; currentPosition = null; document.getElementById('addMarkerBtn').disabled = true; drawMap(); drawLeafletMap();
+          }
+        }
+
+        function deleteMarker(id) {
+          markers = markers.filter(m => m.id !== id);
+          updateTotalDistance();
+          updateUI();
+          drawMap();
+          drawLeafletMap();
+          updateMarkersList();
+        }
+
+        function updateMarkersList() {
+          if (markers.length === 0) { listCard.style.display = 'none'; return; }
+          listCard.style.display = 'block'; list.innerHTML = '';
+          markers.forEach((marker, idx) => {
+            const type = markerConfig[marker.type] || { label:'Unknown', icon:'❓' };
+            const lineInfo = lineConfig[marker.lineSubtype] || { label:'Unknown Line' };
+            const conductorInfo = conductorConfig[marker.conductorType] || { label:'Unknown Conductor' };
+            let spanText = '';
+            if (marker.isLineBreak && marker.startFromMarkerId && marker.spanLength > 0) {
+              const startMarkerIdx = markers.findIndex(m => m.id === marker.startFromMarkerId);
+              spanText = `<span class="span-length" style="color:#a855f7;">Jump Span: ${marker.spanLength.toFixed(0)}m from #${startMarkerIdx+1}</span>`;
+            } else if (idx > 0 && marker.spanLength && !marker.isLineBreak) {
+              spanText = `<span class="span-length">${marker.spanLength.toFixed(0)}m Span</span>`;
+            } else if (marker.isLineBreak && !marker.startFromMarkerId) {
+              spanText = '<span class="span-length" style="color:#dc2626;">New Segment Start (No Connection)</span>';
+            }
+
+            const item = document.createElement('div'); item.className = 'marker-item';
+            const startBtn = `<button class="btn btn-purple" style="padding:5px 10px;font-size:12px;height:32px;margin-right:8px;width:auto;" onclick="startFromMarker(${marker.id})">Start From Here</button>`;
+            item.innerHTML = `
+              <div class="marker-info">
+                <div class="marker-item-icon">${type.icon}</div>
+                <div class="marker-details">
+                  <h4>${type.label} #${idx+1} (${lineInfo.label} / ${conductorInfo.label}) ${spanText}</h4>
+                  <div class="marker-coords">Lat: ${marker.lat.toFixed(6)}, Lng: ${marker.lng.toFixed(6)}</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;">
+                ${startBtn}
+                <button class="delete-btn" onclick="deleteMarker(${marker.id})"><span style="font-size:18px;">🗑️</span></button>
+              </div>
+            `;
+            list.appendChild(item);
+          });
+        }
+
+        /* ---------------------------
+           Save / Load / Export (V3.8)
+           --------------------------- */
+
+        async function saveFileCapacitor(filename, base64Data, mimeType) {
+          const Filesystem = window.Capacitor?.Plugins?.Filesystem;
+          const Share = window.Capacitor?.Plugins?.Share;
+          if (!Filesystem) {
+            const blob = new Blob([Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))], { type: mimeType });
+            await saveFileNativeFallback(filename, blob, mimeType);
+            return;
+          }
+          try {
+            const platform = window.Capacitor && window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : 'web';
+            let directory = 'DOCUMENTS';
+            if (platform === 'ios') directory = 'DOCUMENTS';
+            else if (platform === 'android') directory = 'EXTERNAL';
+            else directory = 'DATA';
+            await Filesystem.writeFile({ path: filename, data: base64Data, directory: directory, recursive: true });
+            try {
+              const uriObj = await Filesystem.getUri({ directory, path: filename });
+              if (Share) { await Share.share({ title: filename, url: uriObj.uri, dialogTitle: 'Share Survey Data' }); }
+              else { alert('File saved to device storage.'); }
+            } catch (e) { alert('File saved to device storage.'); }
+          } catch (e) {
+            console.error('Filesystem/Share Error:', e);
+            alert(`Error saving file: ${e.message || e}`);
+          }
+        }
+
+        async function saveToJSON() {
+          const data = {
+            version: "3.8",
+            siteName, linePoints, markers, totalDistance,
+            selectedMarkerType, selectedLineMainType, selectedLineSubtype, selectedConductorType, surveyType: selectedSurveyType,
+            lineConfig, conductorConfig, markerConfig
+          };
+          const jsonString = JSON.stringify(data, null, 2);
+          const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
+          const filename = `${siteName.replace(/[^a-z0-9]/gi, '_')}-survey-v3-8-dynamic-${Date.now()}.json`;
+          await saveFileCapacitor(filename, base64Data, "application/json");
+          alert("JSON saved successfully!");
+        }
+
+        function loadFromJSON(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const data = JSON.parse(e.target.result);
+              linePoints = data.linePoints || [];
+              siteName = data.siteName || 'New Survey Site';
+              document.getElementById('siteNameInput').value = siteName;
+              selectedSurveyType = data.surveyType || 'proposed';
+              selectedLineSubtype = data.selectedLineSubtype || data.lineSubtype || 'HT_11kV';
+              selectedLineMainType = data.selectedLineMainType || (selectedLineSubtype.split('_')[0]) || 'HT';
+              selectedConductorType = data.selectedConductorType || data.conductorType || 'ACSR_6_1_472';
+              selectedMarkerType = data.selectedMarkerType || 'single_pole';
+              markers = (data.markers || []).map(m => ({
+                id: m.id || Date.now(),
+                type: m.type || 'single_pole',
+                poleType: m.poleType || m.poleType || null,
+                lineMainType: m.lineMainType || (m.lineSubtype || 'HT_11kV').split('_')[0],
+                lineSubtype: m.lineSubtype || 'HT_11kV',
+                conductorType: m.conductorType || 'ACSR_6_1_472',
+                surveyType: m.surveyType || 'proposed',
+                lat: m.lat, lng: m.lng, timestamp: m.timestamp,
+                spanLength: m.spanLength ? parseFloat(m.spanLength) : 0,
+                isLineBreak: m.isLineBreak || false,
+                startFromMarkerId: m.startFromMarkerId || null
+              }));
+              populateConductorType();
+              updateMarkerSelectors();
+              selectMarkerType(selectedMarkerType);
+              updateTotalDistance();
+              updateUI();
+              drawMap();
+              initLeafletMap();
+              updateMarkersList();
+              alert(`Survey data loaded successfully! (Version: ${data.version || 'Unknown'})`);
+            } catch (err) {
+              console.error("Load JSON Error:", err);
+              alert('Error loading file. Check format.');
+            }
+          };
+          reader.readAsText(file);
+          event.target.value = '';
+        }
+
+        /* ---------------------------
+   Legend Drawing Helper (NEW FUNCTION)
+   --------------------------- */
+
+function drawLegend(ctx, x, y, FONT_SCALE) {
+    const PADDING = 10 * FONT_SCALE;
+    const LINE_HEIGHT = 30 * FONT_SCALE;
+    const BOX_WIDTH = 500 * FONT_SCALE;
+    const LEGEND_TITLE_SIZE = 22 * FONT_SCALE;
+    const LEGEND_ITEM_SIZE = 16 * FONT_SCALE;
+    
+    let currentY = y;
+
+    // --- Legend Box Outline ---
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 2 * FONT_SCALE;
+    ctx.strokeRect(x, y, BOX_WIDTH, 0); // Placeholder height, will calculate total height later
+
+    // --- Title ---
+    ctx.fillStyle = '#1f2937';
+    ctx.font = `bold ${LEGEND_TITLE_SIZE}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.fillText('Survey Map Legend', x + PADDING, currentY + PADDING + 5 * FONT_SCALE);
+    currentY += 2 * PADDING + LEGEND_TITLE_SIZE;
+
+    ctx.font = `${LEGEND_ITEM_SIZE}px Arial`;
+
+    // --- Line Status Legend ---
+    ctx.fillText('LINE STATUS', x + PADDING, currentY);
+    currentY += LINE_HEIGHT;
+    
+    // Proposed Line (Dashed)
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 3 * FONT_SCALE;
+    ctx.setLineDash([10 * FONT_SCALE, 5 * FONT_SCALE]);
+    ctx.beginPath();
+    ctx.moveTo(x + PADDING, currentY - 5 * FONT_SCALE);
+    ctx.lineTo(x + PADDING + 50 * FONT_SCALE, currentY - 5 * FONT_SCALE);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#1f2937';
+    ctx.fillText(': Proposed Line/Span', x + PADDING + 60 * FONT_SCALE, currentY);
+    currentY += LINE_HEIGHT;
+    
+    // Existing Line (Solid)
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 3 * FONT_SCALE;
+    ctx.beginPath();
+    ctx.moveTo(x + PADDING, currentY - 5 * FONT_SCALE);
+    ctx.lineTo(x + PADDING + 50 * FONT_SCALE, currentY - 5 * FONT_SCALE);
+    ctx.stroke();
+    ctx.fillStyle = '#1f2937';
+    ctx.fillText(': Existing Line/Span', x + PADDING + 60 * FONT_SCALE, currentY);
+    currentY += LINE_HEIGHT;
+
+    // --- Line Type Legend ---
+    ctx.fillText('LINE TYPES', x + PADDING, currentY);
+    currentY += LINE_HEIGHT;
+    
+    for (const key in lineConfig) {
+        const cfg = lineConfig[key];
+        ctx.strokeStyle = cfg.color;
+        ctx.lineWidth = 3 * FONT_SCALE;
+        ctx.beginPath();
+        ctx.moveTo(x + PADDING, currentY - 5 * FONT_SCALE);
+        ctx.lineTo(x + PADDING + 50 * FONT_SCALE, currentY - 5 * FONT_SCALE);
+        ctx.stroke();
+        ctx.fillStyle = '#1f2937';
+        ctx.fillText(`: ${cfg.label}`, x + PADDING + 60 * FONT_SCALE, currentY);
+        currentY += LINE_HEIGHT;
+    }
+
+    // --- Marker Type Legend ---
+    ctx.fillText('MARKER TYPES', x + PADDING, currentY);
+    currentY += LINE_HEIGHT;
+    
+    for (const key in markerConfig) {
+        const cfg = markerConfig[key];
+        const iconX = x + PADDING + 25 * FONT_SCALE;
+        const iconY = currentY - 5 * FONT_SCALE;
+        
+        ctx.strokeStyle = cfg.color;
+        ctx.lineWidth = 2 * FONT_SCALE;
+        ctx.beginPath();
+        ctx.arc(iconX, iconY, 12 * FONT_SCALE, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.font = `${20 * FONT_SCALE}px Arial`; // Smaller font for legend icon
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(cfg.icon, iconX, iconY + 2 * FONT_SCALE);
+        
+        ctx.fillStyle = '#1f2937';
+        ctx.font = `${LEGEND_ITEM_SIZE}px Arial`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(`: ${cfg.label}`, x + PADDING + 60 * FONT_SCALE, currentY);
+        currentY += LINE_HEIGHT;
+    }
+
+    // --- Finish Box Outline (Update Height) ---
+    const totalHeight = currentY - y + PADDING;
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 2 * FONT_SCALE;
+    ctx.strokeRect(x, y, BOX_WIDTH, totalHeight);
+}
+
+
+/* ---------------------------
+   Legend Drawing Helper (MODIFIED FOR TWO COLUMNS)
+   --------------------------- */
+function drawLegend(ctx, x, y, FONT_SCALE) {
+    const PADDING = 10 * FONT_SCALE;
+    const LINE_HEIGHT = 30 * FONT_SCALE;
+    const TITLE_OFFSET = 10 * FONT_SCALE;
+    const LEGEND_TITLE_SIZE = 22 * FONT_SCALE;
+    const LEGEND_ITEM_SIZE = 16 * FONT_SCALE;
+    
+    // Set box width for two columns (~450px per column + padding)
+    const LEGEND_BOX_WIDTH = 900 * FONT_SCALE; 
+    
+    let currentY = y;
+    
+    // --- 1. Draw Title ---
+    ctx.fillStyle = '#1f2937';
+    ctx.font = `bold ${LEGEND_TITLE_SIZE}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.fillText('Survey Map Legend', x + PADDING, currentY + PADDING + 5 * FONT_SCALE);
+    currentY += 2 * PADDING + LEGEND_TITLE_SIZE + TITLE_OFFSET;
+    
+    // Column start positions
+    let col1Y = currentY; // Left Column Y start
+    let col2Y = currentY; // Right Column Y start
+    const COL2_X_START = x + LEGEND_BOX_WIDTH / 2; // Start X for the second column
+
+    // ------------------------------------------------------------------
+    // COLUMN 1: LINE STATUS AND LINE TYPES
+    // ------------------------------------------------------------------
+
+    // --- Line Status Legend ---
+    ctx.font = `bold ${LEGEND_ITEM_SIZE}px Arial`;
+    ctx.fillText('LINE STATUS', x + PADDING, col1Y);
+    col1Y += LINE_HEIGHT;
+    
+    // Proposed Line (Dashed)
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 3 * FONT_SCALE;
+    ctx.setLineDash([10 * FONT_SCALE, 5 * FONT_SCALE]);
+    ctx.beginPath();
+    ctx.moveTo(x + PADDING, col1Y - 5 * FONT_SCALE);
+    ctx.lineTo(x + PADDING + 50 * FONT_SCALE, col1Y - 5 * FONT_SCALE);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#1f2937';
+    ctx.font = `${LEGEND_ITEM_SIZE}px Arial`;
+    ctx.fillText(': Proposed Line/Span', x + PADDING + 60 * FONT_SCALE, col1Y);
+    col1Y += LINE_HEIGHT;
+    
+    // Existing Line (Solid)
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 3 * FONT_SCALE;
+    ctx.beginPath();
+    ctx.moveTo(x + PADDING, col1Y - 5 * FONT_SCALE);
+    ctx.lineTo(x + PADDING + 50 * FONT_SCALE, col1Y - 5 * FONT_SCALE);
+    ctx.stroke();
+    ctx.fillStyle = '#1f2937';
+    ctx.fillText(': Existing Line/Span', x + PADDING + 60 * FONT_SCALE, col1Y);
+    col1Y += LINE_HEIGHT;
+    col1Y += TITLE_OFFSET; // Extra space before next section
+
+    // --- Line Type Legend ---
+    ctx.font = `bold ${LEGEND_ITEM_SIZE}px Arial`;
+    ctx.fillText('LINE TYPES', x + PADDING, col1Y);
+    col1Y += LINE_HEIGHT;
+    
+    ctx.font = `${LEGEND_ITEM_SIZE}px Arial`;
+    // NOTE: This assumes 'lineConfig' is globally available
+    if (typeof lineConfig !== 'undefined') {
+        for (const key in lineConfig) {
+            const cfg = lineConfig[key];
+            ctx.strokeStyle = cfg.color;
+            ctx.lineWidth = 3 * FONT_SCALE;
+            ctx.beginPath();
+            ctx.moveTo(x + PADDING, col1Y - 5 * FONT_SCALE);
+            ctx.lineTo(x + PADDING + 50 * FONT_SCALE, col1Y - 5 * FONT_SCALE);
+            ctx.stroke();
+            ctx.fillStyle = '#1f2937';
+            ctx.fillText(`: ${cfg.label}`, x + PADDING + 60 * FONT_SCALE, col1Y);
+            col1Y += LINE_HEIGHT;
+        }
+    }
+    
+    const col1Height = col1Y - currentY;
+
+
+    // ------------------------------------------------------------------
+    // COLUMN 2: MARKER TYPES (Parallel to Column 1)
+    // ------------------------------------------------------------------
+    ctx.font = `bold ${LEGEND_ITEM_SIZE}px Arial`;
+    ctx.fillText('MARKER TYPES', COL2_X_START + PADDING, col2Y);
+    col2Y += LINE_HEIGHT;
+    
+    ctx.font = `${LEGEND_ITEM_SIZE}px Arial`;
+    // NOTE: This assumes 'markerConfig' is globally available
+    if (typeof markerConfig !== 'undefined') {
+        for (const key in markerConfig) {
+            const cfg = markerConfig[key];
+            const iconX = COL2_X_START + PADDING + 25 * FONT_SCALE;
+            const iconY = col2Y - 5 * FONT_SCALE;
+            
+            // Draw Marker Symbol
+            ctx.strokeStyle = cfg.color;
+            ctx.lineWidth = 2 * FONT_SCALE;
+            ctx.beginPath();
+            ctx.arc(iconX, iconY, 12 * FONT_SCALE, 0, Math.PI * 2);
+            ctx.stroke();
+    
+            ctx.font = `${20 * FONT_SCALE}px Arial`; // Symbol font size
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(cfg.icon, iconX, iconY + 2 * FONT_SCALE);
+            
+            // Draw Marker Label
+            ctx.fillStyle = '#1f2937';
+            ctx.font = `${LEGEND_ITEM_SIZE}px Arial`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillText(`: ${cfg.label}`, COL2_X_START + PADDING + 60 * FONT_SCALE, col2Y);
+            col2Y += LINE_HEIGHT;
+        }
+    }
+
+    const col2Height = col2Y - currentY;
+
+    // --- 3. Finish Box Outline (Update Height) ---
+    const contentHeight = Math.max(col1Height, col2Height);
+    // Total box height: Space before content (currentY - y) + Content Height + Bottom Padding (PADDING)
+    const totalHeight = (currentY - y) + contentHeight + PADDING; 
+
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 2 * FONT_SCALE;
+    // Draw the box spanning the width of the two columns + padding
+    ctx.strokeRect(x, y, LEGEND_BOX_WIDTH + 2 * PADDING, totalHeight); 
+}
+
+
+async function exportToPNG() {
+    const canvas = document.getElementById('mapCanvas');
+    if (markers.length === 0) { alert('Please add markers before exporting the map.'); return; }
+    
+    // Preserve original dimensions
+    const originalWidth = canvas.width, originalHeight = canvas.height;
+    
+    // A3 dimensions and scaling
+    const A3_WIDTH = 2800, PADDING = 100;
+    const MAP_WIDTH = A3_WIDTH - 2 * PADDING;
+    const MAP_Y_START = 150; // Start of the map after header
+    const FONT_SCALE = A3_WIDTH / 1200;
+
+    // Map drawing scale
+    const MAP_CANVAS_WIDTH = 800;
+    // 1. Draw map temporarily to calculate height (key to 'improved fit')
+    canvas.width = MAP_CANVAS_WIDTH;
+    drawMap(); 
+    const MAP_CANVAS_HEIGHT = canvas.height; 
+    
+    // 2. Calculate the scaled map height for the final PNG
+    const MAP_HEIGHT_SCALED = MAP_WIDTH * (MAP_CANVAS_HEIGHT / MAP_CANVAS_WIDTH);
+    const MAP_Y_START_SCALED = MAP_Y_START * FONT_SCALE;
+
+    // --- Calculate Total Height Needed (For 'Improved Fit') ---
+    const LEGEND_ITEM_LINE_HEIGHT = 30 * FONT_SCALE;
+    const LEGEND_BOX_PADDING = 50 * FONT_SCALE; 
+    
+    // Estimate Legend Content Height (based on the longer column)
+    const MAX_LINE_ITEMS = (typeof lineConfig !== 'undefined' ? Object.keys(lineConfig).length : 5);
+    const COL1_ITEM_COUNT = 1 + 1 + 2 + 1 + MAX_LINE_ITEMS; // Title + Status Title + 2 Status + Type Title + Types
+    const LEGEND_CONTENT_HEIGHT = (COL1_ITEM_COUNT * LEGEND_ITEM_LINE_HEIGHT) + LEGEND_BOX_PADDING;
+
+    // Total Canvas Height = Header + Map + Gap + Legend + Bottom Padding
+    const TOTAL_HEIGHT_NEEDED = MAP_Y_START_SCALED + MAP_HEIGHT_SCALED + PADDING + LEGEND_CONTENT_HEIGHT + PADDING;
+
+
+    // --- Create Final PNG Canvas ---
+    const pdfCanvas = document.createElement('canvas');
+    pdfCanvas.width = A3_WIDTH;
+    pdfCanvas.height = TOTAL_HEIGHT_NEEDED; // Set to the calculated height for best fit
+    
+    const pdfCtx = pdfCanvas.getContext('2d');
+    pdfCtx.fillStyle = '#ffffff';
+    pdfCtx.fillRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+
+    // --- 1. Header ---
+    pdfCtx.fillStyle = '#1f2937';
+    pdfCtx.font = `bold ${36 * FONT_SCALE}px Arial`;
+    pdfCtx.textAlign = 'center';
+    pdfCtx.fillText('Electrical Line Survey Report', A3_WIDTH / 2, 70 * FONT_SCALE);
+    pdfCtx.font = `${18 * FONT_SCALE}px Arial`;
+    pdfCtx.textAlign = 'left';
+    // Assuming siteName and totalDistance are available globals
+    pdfCtx.fillText(`Site Name: ${siteName}`, PADDING, 110 * FONT_SCALE);
+    pdfCtx.fillText(`Total Distance: ${totalDistance.toFixed(1)}m`, PADDING, 135 * FONT_SCALE);
+
+    // --- 2. Draw Map ---
+    pdfCtx.drawImage(canvas, PADDING, MAP_Y_START_SCALED, MAP_WIDTH, MAP_HEIGHT_SCALED);
+
+    // --- 3. Draw Legend ---
+    const LEGEND_X = PADDING;
+    const LEGEND_Y = MAP_Y_START_SCALED + MAP_HEIGHT_SCALED + PADDING; // Position below the map
+    drawLegend(pdfCtx, LEGEND_X, LEGEND_Y, FONT_SCALE);
+
+    // --- 4. Finalization ---
+    // Restore the main map canvas to original dimensions
+    canvas.width = originalWidth;
+    canvas.height = originalHeight;
+    drawMap();
+
+    const dataURL = pdfCanvas.toDataURL("image/png");
+    const base64Data = dataURL.split(",")[1];
+    const filename = `${siteName.replace(/[^a-z0-9]/gi, '_')}-main-v3-8-dynamic-${Date.now()}.png`;
+    
+    await saveFileCapacitor(filename, base64Data, "image/png");
+    alert("PNG saved successfully!");
+}
+
+
+
+
+function fitCanvasToBounds(minLat, maxLat, minLng, maxLng, width, height) {
+  const padding = 60;
+  const latRange = maxLat - minLat || 0.001;
+  const lngRange = maxLng - minLng || 0.001;
+
+  const scaleX = (width - padding * 2) / lngRange;
+  const scaleY = (height - padding * 2) / latRange;
+
+  canvasCamera.scale = Math.min(scaleX, scaleY);
+  canvasCamera.x = padding;
+  canvasCamera.y = height - padding;
+}
+
+
+
+
+        async function exportToCSV() {
+          if (markers.length === 0) { alert('No markers to export.'); return; }
+          let csvContent = 'Site,Survey Type,Span Description,Marker No,Marker Type,Line Main,Line Subtype,Conductor,Lat,Lng,Span,ConnectedFrom,CumulativeDistance,IsLineBreak\n';
+          let cumulativeDistance = 0;
+          markers.forEach((marker, idx) => {
+            const typeLabel = (markerConfig[marker.type]||{label:'Unknown'}).label;
+            const line = lineConfig[marker.lineSubtype] || { label: 'Unknown Line' };
+            const conductor = conductorConfig[marker.conductorType] || { label: 'Unknown Conductor' };
+            const surveyTypeLabel = marker.surveyType === 'proposed' ? 'Proposed' : 'Existing';
+            let spanText = '';
+            let connectedFrom = '';
+            if (idx > 0 && marker.spanLength && !marker.isLineBreak) { spanText = `${marker.spanLength.toFixed(2)}m`; cumulativeDistance += marker.spanLength; }
+            else if (marker.isLineBreak && marker.startFromMarkerId && marker.spanLength > 0) { spanText = `${marker.spanLength.toFixed(2)}m`; const startIdx = markers.findIndex(m=>m.id===marker.startFromMarkerId); connectedFrom = `Marker #${startIdx+1}`; cumulativeDistance += marker.spanLength; }
+            else if (marker.isLineBreak) { spanText = 'New Segment Start'; }
+            const row = [
+              siteName, surveyTypeLabel, (idx>0?`#${idx}→#${idx+1}`:'Start'),
+              idx+1, typeLabel, (marker.lineMainType||''), (marker.lineSubtype||''), (conductor.label||''), marker.lat, marker.lng,
+              spanText, connectedFrom, cumulativeDistance.toFixed(2), marker.isLineBreak
+            ].map(v => `"${v}"`).join(',');
+            csvContent += row + "\n";
+          });
+          const base64Data = btoa(unescape(encodeURIComponent(csvContent)));
+          const filename = `${siteName.replace(/[^a-z0-9]/gi,'_')}-data-v3-8-dynamic-${Date.now()}.csv`;
+          await saveFileCapacitor(filename, base64Data, "text/csv");
+          alert("CSV saved successfully!");
+        }
+
+        function clearAll(){
+          if (!confirm('Are you sure you want to clear all survey data (points and markers)? This cannot be undone.')) return;
+          stopTracking();
+          linePoints = []; markers = []; totalDistance = 0; currentPosition = null; accuracy = null; startFromMarkerIndex = null; startFromMarkerPosition = null;
+          document.getElementById('siteNameInput').value = "New Survey Site"; siteName = "New Survey Site";
+          updateTotalDistance(); updateUI(); updateMarkersList(); drawMap(); initLeafletMap();
+          gpsStatusElement.textContent = 'All data cleared. Ready to start a new survey.'; gpsStatusElement.style.color = '#3b82f6';
+          alert('All data cleared.');
+        }
+        
+        /**
+ * Opens a specified URL (the User Manual) in a new, centered popup window.
+ * @param {string} url - The Google Drive URL for the manual.
+ */
+function openManualPopup(url) {
+    // Define the size and centering of the popup
+    const popupWidth = 800;
+    const popupHeight = 600;
+    const left = (screen.width / 2) - (popupWidth / 2);
+    const top = (screen.height / 2) - (popupHeight / 2);
+
+    // Features control the appearance: scrollbars and resizability are useful for a document
+    const features = `width=${popupWidth},height=${popupHeight},top=${top},left=${left},scrollbars=yes,resizable=yes`;
+
+    // Open the window
+    window.open(url, 'UserManualPopup', features);
+
+    // NOTE: Due to modern browser security, the effectiveness of popups 
+    // depends on browser settings and the action being user-initiated (which 'onclick' is).
+}
+/* ---------------------------
+   Initialization
+   --------------------------- */
+document.addEventListener('DOMContentLoaded', () => {
+
+  // ✅ USE GLOBAL VARIABLES (NO const)
+  canvas = document.getElementById('mapCanvas');
+  ctx = canvas.getContext('2d');
+
+  /* ================= TOUCH PAN ================= */
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      canvasCamera.lastX = e.touches[0].clientX;
+      canvasCamera.lastY = e.touches[0].clientY;
     }
   });
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    canvasCamera.x += t.clientX - canvasCamera.lastX;
+    canvasCamera.y += t.clientY - canvasCamera.lastY;
+    canvasCamera.lastX = t.clientX;
+    canvasCamera.lastY = t.clientY;
+    drawMap();
+  }, { passive: false });
+
+  /* ================= MOUSE PAN ================= */
+  canvas.addEventListener('mousedown', e => {
+    canvasCamera.isDragging = true;
+    canvasCamera.lastX = e.clientX;
+    canvasCamera.lastY = e.clientY;
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    if (!canvasCamera.isDragging) return;
+    canvasCamera.x += e.clientX - canvasCamera.lastX;
+    canvasCamera.y += e.clientY - canvasCamera.lastY;
+    canvasCamera.lastX = e.clientX;
+    canvasCamera.lastY = e.clientY;
+    drawMap();
+  });
+
+  canvas.addEventListener('mouseup', () => canvasCamera.isDragging = false);
+  canvas.addEventListener('mouseleave', () => canvasCamera.isDragging = false);
+
+  /* ================= WHEEL ZOOM ================= */
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    canvasCamera.x = mx - (mx - canvasCamera.x) * zoomFactor;
+    canvasCamera.y = my - (my - canvasCamera.y) * zoomFactor;
+    canvasCamera.scale = Math.max(0.2, Math.min(6, canvasCamera.scale * zoomFactor));
+    drawMap();
+  }, { passive: false });
+
+  /* ================= APP INIT ================= */
+  populateConductorType();
+  updateMarkerSelectors();
+  checkSession();
 });
 
-/* ---------------- PRINT / PDF ---------------- */
-function printMap(){
-  window.print();
-}
+window.addEventListener('resize', () => {
+  if (!canvas) return;
 
-/* ---------------- NAVIGATION ---------------- */
-function navigate(lat,lng){
-  const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-  window.open(url,'_blank');
-}
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+
+  canvasInitialized = false;
+  drawMap();
+});
 
 </script>
+<div id="paymentPopup" style="display:none; position:fixed; inset:0;
+background:rgba(0,0,0,0.6); z-index:2000;">
+
+  <div style="background:#fff; max-width:350px; margin:10% auto;
+  padding:20px; border-radius:12px; text-align:center;">
+
+    <h3>Lifetime App Purchase</h3>
+    <p style="font-weight:bold; color:#10b981;">
+        ₹ 749 /- ONLY (Lifetime Access)
+    </p>
+
+    <p>
+        Pay via UPI:
+        <br>
+        <b id="upiIdText">er.ajay96@okicicibank</b>
+    </p>
+
+    <button class="btn btn-blue" onclick="copyUPI()">
+        📋 Copy UPI ID
+    </button>
+
+    <p style="margin-top:10px;">Scan QR:</p>
+    <img
+      src="https://github.com/er-ajay96/SurveyAppV1.0.0/blob/main/GooglePay_QR.png?raw=true"
+      style="width:200px;border:1px solid #ddd;border-radius:8px;"
+    >
+
+    <button class="btn btn-red" style="margin-top:15px;"
+      onclick="closePaymentPopup()">Close</button>
+  </div>
+</div>
+
 </body>
 </html>
