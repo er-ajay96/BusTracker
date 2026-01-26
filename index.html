@@ -558,6 +558,7 @@
 // ===== CANVAS GLOBALS =====
 let canvas;
 let ctx;
+let worldBounds = null; // { minLat, maxLat, minLng, maxLng }
 
 const canvasCamera = {
   scale: 1,
@@ -1166,20 +1167,86 @@ let leafletPolylines = [];
         }
       
 
-        function zoomInCanvas() {
-  canvasCamera.scale = Math.min(canvasCamera.scale * 1.2, 6);
+function drawMapToContext(ctx, width, height) {
+  if (!worldBounds) return;
+
+  const { minLat, maxLat, minLng, maxLng } = worldBounds;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#f0f9ff';
+  ctx.fillRect(0, 0, width, height);
+
+  const padding = 80;
+  const scaleX = (width - padding * 2) / (maxLng - minLng || 0.001);
+  const scaleY = (height - padding * 2) / (maxLat - minLat || 0.001);
+  const scale = Math.min(scaleX, scaleY);
+
+  const toX = lng => padding + (lng - minLng) * scale;
+  const toY = lat => height - padding - (lat - minLat) * scale;
+
+  // Draw lines
+  for (let i = 1; i < markers.length; i++) {
+    const a = markers[i - 1];
+    const b = markers[i];
+    ctx.strokeStyle = lineConfig[b.lineSubtype]?.color || '#3b82f6';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(toX(a.lng), toY(a.lat));
+    ctx.lineTo(toX(b.lng), toY(b.lat));
+    ctx.stroke();
+  }
+
+  // Draw markers
+  markers.forEach((m, i) => {
+    const color = m.type === 'dtr'
+      ? markerConfig.dtr.color
+      : lineConfig[m.lineSubtype]?.color || '#3b82f6';
+
+    const x = toX(m.lng);
+    const y = toY(m.lat);
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, 14, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.font = '18px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(markerConfig[m.type].icon, x, y);
+  });
+}
+
+
+
+function zoomCanvas(factor) {
+  if (!canvas) return;
+
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+
+  // Keep center point fixed
+  canvasCamera.x = cx - (cx - canvasCamera.x) * factor;
+  canvasCamera.y = cy - (cy - canvasCamera.y) * factor;
+
+  canvasCamera.scale = Math.max(0.2, Math.min(6, canvasCamera.scale * factor));
   drawMap();
 }
 
+function zoomInCanvas() {
+  zoomCanvas(1.25);
+}
+
 function zoomOutCanvas() {
-  canvasCamera.scale = Math.max(canvasCamera.scale / 1.2, 0.2);
-  drawMap();
+  zoomCanvas(0.8);
 }
 
 function resetCanvasZoom() {
   canvasInitialized = false;
   drawMap();
 }
+
 
 
 function initCanvas() {
@@ -1199,7 +1266,7 @@ function initCanvas() {
 
 
 function drawMap() {
-  if (!canvas || !ctx) return; // ⛑️ safety guard
+  if (!canvas || !ctx) return;
 
   const width = canvas.width;
   const height = canvas.height;
@@ -1226,11 +1293,11 @@ function drawMap() {
   );
 
   /* ================= COLLECT POINTS ================= */
-  const pointsForBounds = [...markers, ...linePoints];
-  if (currentPosition && isManualPosition) pointsForBounds.push(currentPosition);
-  if (startFromMarkerPosition) pointsForBounds.push(startFromMarkerPosition);
+  const points = [...markers, ...linePoints];
+  if (currentPosition && isManualPosition) points.push(currentPosition);
+  if (startFromMarkerPosition) points.push(startFromMarkerPosition);
 
-  if (pointsForBounds.length === 0) {
+  if (points.length === 0) {
     ctx.fillStyle = '#64748b';
     ctx.font = '16px Arial';
     ctx.textAlign = 'center';
@@ -1239,14 +1306,21 @@ function drawMap() {
     return;
   }
 
-  const lats = pointsForBounds.map(p => p.lat);
-  const lngs = pointsForBounds.map(p => p.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  /* ================= WORLD BOUNDS (LOCK ONCE) ================= */
+  if (!worldBounds) {
+    const lats = points.map(p => p.lat);
+    const lngs = points.map(p => p.lng);
+    worldBounds = {
+      minLat: Math.min(...lats),
+      maxLat: Math.max(...lats),
+      minLng: Math.min(...lngs),
+      maxLng: Math.max(...lngs)
+    };
+  }
 
-  /* ================= INITIAL FIT ================= */
+  const { minLat, maxLat, minLng, maxLng } = worldBounds;
+
+  /* ================= INITIAL FIT (ONCE) ================= */
   if (!canvasInitialized) {
     const padding = 80;
     const latRange = maxLat - minLat || 0.001;
@@ -1294,19 +1368,17 @@ function drawMap() {
   /* ================= LINES ================= */
   const dash = selectedSurveyType === 'proposed' ? [10, 5] : [];
 
-  if (markers.length > 1) {
-    for (let i = 1; i < markers.length; i++) {
-      const a = markers[i - 1];
-      const b = markers[i];
-      ctx.strokeStyle = lineConfig[b.lineSubtype]?.color || '#3b82f6';
-      ctx.lineWidth = 3;
-      ctx.setLineDash(dash);
-      ctx.beginPath();
-      ctx.moveTo(toX(a.lng), toY(a.lat));
-      ctx.lineTo(toX(b.lng), toY(b.lat));
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
+  for (let i = 1; i < markers.length; i++) {
+    const a = markers[i - 1];
+    const b = markers[i];
+    ctx.strokeStyle = lineConfig[b.lineSubtype]?.color || '#3b82f6';
+    ctx.lineWidth = 3;
+    ctx.setLineDash(dash);
+    ctx.beginPath();
+    ctx.moveTo(toX(a.lng), toY(a.lat));
+    ctx.lineTo(toX(b.lng), toY(b.lat));
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   /* ================= MARKERS ================= */
@@ -1338,13 +1410,18 @@ function drawMap() {
   if (currentPosition) {
     ctx.fillStyle = isManualPosition ? '#a855f7' : '#10b981';
     ctx.beginPath();
-    ctx.arc(toX(currentPosition.lng), toY(currentPosition.lat), isManualPosition ? 10 : 8, 0, Math.PI * 2);
+    ctx.arc(
+      toX(currentPosition.lng),
+      toY(currentPosition.lat),
+      isManualPosition ? 10 : 8,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
   }
 
   ctx.restore();
 }
-
 
        
         let mapTiles = null;
@@ -1804,52 +1881,74 @@ function drawMap() {
           await saveFileCapacitor(filename, base64Data, "application/json");
           alert("JSON saved successfully!");
         }
+function loadFromJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
 
-        function loadFromJSON(event) {
-          const file = event.target.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            try {
-              const data = JSON.parse(e.target.result);
-              linePoints = data.linePoints || [];
-              siteName = data.siteName || 'New Survey Site';
-              document.getElementById('siteNameInput').value = siteName;
-              selectedSurveyType = data.surveyType || 'proposed';
-              selectedLineSubtype = data.selectedLineSubtype || data.lineSubtype || 'HT_11kV';
-              selectedLineMainType = data.selectedLineMainType || (selectedLineSubtype.split('_')[0]) || 'HT';
-              selectedConductorType = data.selectedConductorType || data.conductorType || 'ACSR_6_1_472';
-              selectedMarkerType = data.selectedMarkerType || 'single_pole';
-              markers = (data.markers || []).map(m => ({
-                id: m.id || Date.now(),
-                type: m.type || 'single_pole',
-                poleType: m.poleType || m.poleType || null,
-                lineMainType: m.lineMainType || (m.lineSubtype || 'HT_11kV').split('_')[0],
-                lineSubtype: m.lineSubtype || 'HT_11kV',
-                conductorType: m.conductorType || 'ACSR_6_1_472',
-                surveyType: m.surveyType || 'proposed',
-                lat: m.lat, lng: m.lng, timestamp: m.timestamp,
-                spanLength: m.spanLength ? parseFloat(m.spanLength) : 0,
-                isLineBreak: m.isLineBreak || false,
-                startFromMarkerId: m.startFromMarkerId || null
-              }));
-              populateConductorType();
-              updateMarkerSelectors();
-              selectMarkerType(selectedMarkerType);
-              updateTotalDistance();
-              updateUI();
-              drawMap();
-              initLeafletMap();
-              updateMarkersList();
-              alert(`Survey data loaded successfully! (Version: ${data.version || 'Unknown'})`);
-            } catch (err) {
-              console.error("Load JSON Error:", err);
-              alert('Error loading file. Check format.');
-            }
-          };
-          reader.readAsText(file);
-          event.target.value = '';
-        }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+
+      // 🧠 RESET CANVAS + EXPORT STATE (CRITICAL)
+      canvasInitialized = false;   // allow fresh auto-fit
+      worldBounds = null;          // required for full PNG export
+      canvasCamera.x = 0;
+      canvasCamera.y = 0;
+      canvasCamera.scale = 1;
+
+      // 📥 LOAD CORE DATA
+      linePoints = data.linePoints || [];
+      markers = (data.markers || []).map(m => ({
+        id: m.id || Date.now(),
+        type: m.type || 'single_pole',
+        poleType: m.poleType || null,
+        lineMainType: m.lineMainType || (m.lineSubtype || 'HT_11kV').split('_')[0],
+        lineSubtype: m.lineSubtype || 'HT_11kV',
+        conductorType: m.conductorType || 'ACSR_6_1_472',
+        surveyType: m.surveyType || 'proposed',
+        lat: m.lat,
+        lng: m.lng,
+        timestamp: m.timestamp,
+        spanLength: m.spanLength ? parseFloat(m.spanLength) : 0,
+        isLineBreak: m.isLineBreak || false,
+        startFromMarkerId: m.startFromMarkerId || null
+      }));
+
+      // 🏷 SITE + CONFIG
+      siteName = data.siteName || 'New Survey Site';
+      document.getElementById('siteNameInput').value = siteName;
+
+      selectedSurveyType = data.surveyType || 'proposed';
+      selectedLineSubtype = data.selectedLineSubtype || data.lineSubtype || 'HT_11kV';
+      selectedLineMainType =
+        data.selectedLineMainType ||
+        (selectedLineSubtype.split('_')[0]) ||
+        'HT';
+
+      selectedConductorType = data.selectedConductorType || data.conductorType || 'ACSR_6_1_472';
+      selectedMarkerType = data.selectedMarkerType || 'single_pole';
+
+      // 🔄 UI + MAP REFRESH
+      populateConductorType();
+      updateMarkerSelectors();
+      selectMarkerType(selectedMarkerType);
+      updateTotalDistance();
+      updateUI();
+      drawMap();
+      initLeafletMap();
+      updateMarkersList();
+
+      alert(`Survey data loaded successfully! (Version: ${data.version || 'Unknown'})`);
+    } catch (err) {
+      console.error('Load JSON Error:', err);
+      alert('Error loading file. Check format.');
+    }
+  };
+
+  reader.readAsText(file);
+  event.target.value = '';
+}
 
         /* ---------------------------
    Legend Drawing Helper (NEW FUNCTION)
@@ -2155,7 +2254,17 @@ async function exportToPNG() {
     pdfCtx.fillText(`Total Distance: ${totalDistance.toFixed(1)}m`, PADDING, 135 * FONT_SCALE);
 
     // --- 2. Draw Map ---
-    pdfCtx.drawImage(canvas, PADDING, MAP_Y_START_SCALED, MAP_WIDTH, MAP_HEIGHT_SCALED);
+   const exportMapCanvas = document.createElement('canvas');
+exportMapCanvas.width = MAP_WIDTH;
+exportMapCanvas.height = MAP_HEIGHT_SCALED;
+
+const exportMapCtx = exportMapCanvas.getContext('2d');
+
+// 🔥 draw FULL world, not viewport
+drawMapToContext(exportMapCtx, exportMapCanvas.width, exportMapCanvas.height);
+
+pdfCtx.drawImage(exportMapCanvas, PADDING, MAP_Y_START_SCALED);
+
 
     // --- 3. Draw Legend ---
     const LEGEND_X = PADDING;
@@ -2222,16 +2331,49 @@ function fitCanvasToBounds(minLat, maxLat, minLng, maxLng, width, height) {
           alert("CSV saved successfully!");
         }
 
-        function clearAll(){
-          if (!confirm('Are you sure you want to clear all survey data (points and markers)? This cannot be undone.')) return;
-          stopTracking();
-          linePoints = []; markers = []; totalDistance = 0; currentPosition = null; accuracy = null; startFromMarkerIndex = null; startFromMarkerPosition = null;
-          document.getElementById('siteNameInput').value = "New Survey Site"; siteName = "New Survey Site";
-          updateTotalDistance(); updateUI(); updateMarkersList(); drawMap(); initLeafletMap();
-          gpsStatusElement.textContent = 'All data cleared. Ready to start a new survey.'; gpsStatusElement.style.color = '#3b82f6';
-          alert('All data cleared.');
-        }
-        
+        function clearAll() {
+  if (!confirm('Are you sure you want to clear all survey data (points and markers)? This cannot be undone.')) return;
+
+  // 🛑 Stop GPS tracking safely
+  stopTracking();
+
+  // 🧹 Clear all survey data
+  linePoints = [];
+  markers = [];
+  totalDistance = 0;
+  currentPosition = null;
+  accuracy = null;
+  startFromMarkerIndex = null;
+  startFromMarkerPosition = null;
+
+  // 🧠 RESET CANVAS + EXPORT STATE (CRITICAL)
+  canvasInitialized = false;      // allow fresh fit-to-bounds
+  worldBounds = null;             // required for full export
+  canvasCamera.x = 0;
+  canvasCamera.y = 0;
+  canvasCamera.scale = 1;
+
+  // 🏷 Reset site info
+  siteName = 'New Survey Site';
+  const siteInput = document.getElementById('siteNameInput');
+  if (siteInput) siteInput.value = siteName;
+
+  // 🔄 UI refresh
+  updateTotalDistance();
+  updateUI();
+  updateMarkersList();
+
+  // 🎨 Redraw views
+  drawMap();
+  initLeafletMap();
+
+  // 📡 Status message
+  gpsStatusElement.textContent = 'All data cleared. Ready to start a new survey.';
+  gpsStatusElement.style.color = '#3b82f6';
+
+  alert('All data cleared.');
+}
+
         /**
  * Opens a specified URL (the User Manual) in a new, centered popup window.
  * @param {string} url - The Google Drive URL for the manual.
